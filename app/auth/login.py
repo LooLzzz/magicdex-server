@@ -2,6 +2,7 @@ import re
 # from flask import jsonify
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
+from flask_jwt_extended import create_access_token
 
 from .. import mongo, bcrypt
 
@@ -21,23 +22,16 @@ def get_arg_list():
 
 class LoginApi(Resource):
     def get(self):
-        # TODO return JWT or some sort of auth token
         username, password = get_arg_list()
-
-        user = db.find_one({'username': re.compile(username, re.IGNORECASE)})
+        user = db.find_one({ 'username': re.compile(username, re.IGNORECASE) })
 
         if user:
             password_hash = user['password']
             if bcrypt.check_password_hash(password_hash, password):
-                return (
-                    {
-                        'message': f'logged in as {username}',
-                        'auth_token': 'TODO',
-                    }, 200
-                )
+                token = create_access_token(identity=username)
+                return { 'access-token': token }
             
         return (
-            {
-                'message': 'username & password combination not found',
-            }, 401
+            { 'msg': 'username/password combination not found' },
+            401
         )

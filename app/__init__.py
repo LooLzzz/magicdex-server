@@ -1,7 +1,7 @@
 import os, dotenv, certifi
 from flask import Flask
 from flask_bcrypt import Bcrypt
-from flask_jwt import JWT
+from flask_jwt_extended import JWTManager
 from flask_pymongo import PyMongo
 from flask_restful import Api
 from flask_sslify import SSLify
@@ -26,8 +26,7 @@ sslify = SSLify(app)
 mongo = PyMongo(app, tlsCAFile=certifi.where())
 bcrypt = Bcrypt(app)
 api = Api(app)
-# jwt = JWT(app) # TODO
-
+jwt = JWTManager(app)
 
 ## start `main.py`
 from . import main
