@@ -1,9 +1,9 @@
 import re
-from flask import jsonify
+# from flask import jsonify
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
 
-from . import mongo, bcrypt
+from .. import mongo, bcrypt
 
 
 db = mongo.db['users']
@@ -19,7 +19,7 @@ def get_arg_list():
     return (username, password)
 
 
-class AuthApi(Resource):
+class LoginApi(Resource):
     def get(self):
         # TODO return JWT or some sort of auth token
         username, password = get_arg_list()
@@ -41,7 +41,3 @@ class AuthApi(Resource):
                 'message': 'username & password combination not found',
             }, 401
         )
-
-
-    def post(self):
-        return self.get()
