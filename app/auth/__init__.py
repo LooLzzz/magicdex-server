@@ -1,3 +1,2 @@
-from .login import LoginApi
-from .register import RegisterApi
+from .users import UsersApi
 from .jwt import JwtApi

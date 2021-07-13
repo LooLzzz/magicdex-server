@@ -2,6 +2,7 @@ import re
 # from flask import jsonify
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
+from flask_jwt_extended import create_access_token
 
 from .. import mongo, bcrypt
 
@@ -19,8 +20,24 @@ def get_arg_list():
     return (username, password)
 
 
-class RegisterApi(Resource):
+class UsersApi(Resource):
+    def get(self):
+        '''login endpoint'''
+        username, password = get_arg_list()
+        user = db.find_one({ 'username': re.compile(username, re.IGNORECASE) })
+
+        if user:
+            password_hash = user['password']
+            if bcrypt.check_password_hash(password_hash, password):
+                token = create_access_token(identity=username)
+                return { 'access-token': token }
+            
+        return (
+            { 'msg': 'username/password combination not found' },
+            401
+        )
+
     def post(self):
-        '''create a new user'''
+        '''register endpoint'''
         #TODO all this shiz
         pass

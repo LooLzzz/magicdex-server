@@ -1,8 +1,5 @@
-from flask_pymongo import ASCENDING
-
 from . import app, api
-from .auth import LoginApi, RegisterApi, JwtApi
-from .users import UsersApi
+from .auth import UsersApi, JwtApi
 from .cards import CardsApi
 
 
@@ -12,12 +9,11 @@ def index():
 
 
 ## auth ##
-api.add_resource(LoginApi, '/auth/login')
-api.add_resource(RegisterApi, '/auth/register')
-api.add_resource(JwtApi, '/auth')
+api.add_resource(UsersApi, '/auth/users', endpoint='AuthApi_Users')
+api.add_resource(JwtApi, '/auth/jwt')
 
 ## cards ##
-api.add_resource(CardsApi, '/cards', '/cards/searchSellers')
+api.add_resource(CardsApi, '/cards', '/cards/sellers')
 
 ## users ##
 api.add_resource(UsersApi, '/users/<string:userId>')
