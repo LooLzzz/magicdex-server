@@ -29,6 +29,5 @@ bcrypt = Bcrypt(app)
 api = Api(app)
 jwt = JWTManager(app)
 
-
 ## start `main.py`
 from . import main
