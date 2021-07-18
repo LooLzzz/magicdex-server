@@ -1,23 +1,28 @@
-from flask_pymongo import ASCENDING
+from flask_jwt_extended import jwt_required
 
 from . import app, api
-from .auth import LoginApi, RegisterApi, JwtApi
-from .users import UsersApi
+from .auth import UsersApi, JwtApi
 from .cards import CardsApi
 
 
 @app.route('/')
 def index():
-    return '<h1>Hello from Flask</h1>'
+    return { 'msg': 'this is not the api you are looking for' }
 
 
 ## auth ##
-api.add_resource(LoginApi, '/auth/login')
-api.add_resource(RegisterApi, '/auth/register')
-api.add_resource(JwtApi, '/auth')
+api.add_resource(UsersApi, '/auth/users', endpoint='AuthApi_Users')
+api.add_resource(JwtApi, '/auth/jwt', endpoint='AuthApi_Jwt')
+
 
 ## cards ##
-api.add_resource(CardsApi, '/cards', '/cards/searchSellers')
+api.add_resource(CardsApi, '/cards/sellers', endpoint='CardsApi_Sellers')
+
+@app.route('/cards/phash', methods=['GET'])
+@jwt_required()
+def getInitialPhash():
+    pass
+
 
 ## users ##
-api.add_resource(UsersApi, '/users/<string:userId>')
+api.add_resource(UsersApi, '/users/<string:userId>', endpoint='UsersApi')
