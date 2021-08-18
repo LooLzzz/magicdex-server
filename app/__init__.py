@@ -7,7 +7,6 @@ from flask_pymongo import PyMongo
 from flask_restful import Api
 from flask_sslify import SSLify
 
-
 ## load `.env` file if exists
 env_filepath = dotenv.find_dotenv('.env')
 if os.path.exists(env_filepath):

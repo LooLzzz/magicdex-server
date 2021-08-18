@@ -1,7 +1,8 @@
 from flask_jwt_extended import jwt_required
 
 from . import app, api
-from .auth import UsersApi, JwtApi
+from .auth import UsersApi as AuthUsersApi, JwtApi
+from .users import UsersApi
 from .cards import CardsApi
 
 
@@ -11,7 +12,7 @@ def index():
 
 
 ## auth ##
-api.add_resource(UsersApi, '/auth/users', endpoint='AuthApi_Users')
+api.add_resource(AuthUsersApi, '/auth/users', endpoint='AuthUsersApi')
 api.add_resource(JwtApi, '/auth/jwt')
 
 
@@ -25,4 +26,5 @@ def getInitialPhash():
 
 
 ## users ##
-api.add_resource(UsersApi, '/users/<string:userId>')
+# api.add_resource(UsersApi, '/users/<string:user_id>')
+api.add_resource(UsersApi, '/users')
