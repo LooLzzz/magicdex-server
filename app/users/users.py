@@ -1,9 +1,7 @@
 import re, json
-from flask import jsonify
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from bson.objectid import ObjectId
 
 from .. import mongo
 from ..utils import get_arg_dict, dictkeys_to_lower
