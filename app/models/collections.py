@@ -2,21 +2,30 @@ from typing import Iterable, Union, List
 from bson.objectid import ObjectId
 
 from .. import mongo
-from . import Card
+from . import CardModel
 
 users_db = mongo.db['users']
 collections_db = mongo.db['collections']
 
 
-class Collection():
+class CollectionModel():
     def __init__(self, user_id:Union[ObjectId, str]):
-        data = collections_db.find_one({'user_id': ObjectId(user_id)})
-        
+        data = collections_db.find_one(
+            # filter
+            { 'user_id': ObjectId(user_id) },
+            {
+                # projection
+                '_id': '$_id',
+                'user_id': '$user_id',
+            }
+        )
+        if not data:
+            raise ValueError('Collection does not exist')
+
         self._id = data['_id']
         self.user_id = data['user_id']
-        
-        cardlist = [ Card(parent=self, **item) for item in data['cards'] ]
-        self._cards = { card._id: card for card in cardlist }
+        self._cards = {}
+        # self._cards = { card._id: card for card in [CardModel(parent=self, **item) for item in data['cards']] }
 
     def __getitem__(self, key):
         if isinstance(key, str):
@@ -48,6 +57,9 @@ class Collection():
     def items(self):
         return self._cards.items()
 
+    def __repr__(self):
+        return repr(self._cards)
+
     def to_JSON(self, mongo=False):
         '''
         Converts the collection to a JSON, used for JSON serialization.
@@ -58,15 +70,23 @@ class Collection():
             'cards': [ card.to_JSON(mongo) for card in self.values() ],
         }
 
-    def __repr__(self):
-        return repr(self._cards)
-
-    def find_cid(self, other:Card):
+    def find_cid(self, other:CardModel):
         for card in self.values():
             if card == other:
                 return card._id
-        
         return None
+
+    @classmethod
+    def create(cls, user_id):
+        '''
+        Creates a new collection and saves it to the database.
+        '''
+        user_id = ObjectId(user_id)
+        collections_db.insert_one({
+            'user_id': user_id,
+            'cards': [],
+        })
+        return cls(user_id)
 
     def save(self):
         '''
@@ -77,7 +97,7 @@ class Collection():
         cards = [ card.to_JSON(mongo=True) for card in self.values() ]
         newvalues = { "$set": {'cards':cards} }
 
-        res = collections_db.update_one({'_id': self._id}, newvalues)
+        res = collections_db.update_one({'_id': self._id}, newvalues, upsert=True)
         return res
     
     def clear(self):
@@ -85,53 +105,44 @@ class Collection():
         Clears the collection.
         Does not update the database.
 
-        :return: An Updated `Collection` object
+        :return: An updated `CollectionModel` object
         '''
         self._cards.clear()
         return self
     
-    def add(self, card:Card):
+    def add(self, card:CardModel):
         if not card._id:
             raise ValueError('Cannot add card without an id')
         if card._id in self:
             raise ValueError('Card id already exists in collection')
         
-        card = card.none_to_default_values()
-        if card.amount <= 0:
-            raise ValueError('Card amount must be greater than 0')
-
-        self[card._id] = card
+        card = card.none_values_to_default()
+        if card.amount > 0:
+            self[card._id] = card
+        # else:
+        #     raise ValueError('Card amount must be greater than 0')
+        
         return self
 
-    def remove(self, key):
-        '''
-        Removes the given card from the collection.
-        Does not update the database.
+    # def merge(self, a:CardModel, b:CardModel):
+    #     '''
+    #     Merges two given cards into one card, result will be put into object `a`.
+    #     Does not update the database.
 
-        :return: An Updated `Collection` object
-        '''
-        del self[key]
-        return self
+    #     :param a: The id of the first card
+    #     :param b: The id of the second card
+    #     :return: `ObjectId` of the newly merged card
+    #     '''
+    #     a.update(b)
+    #     del self[b]
+    #     return a
 
-    def merge(self, a:ObjectId, b:ObjectId):
-        '''
-        Merges the given cards into one card.
-        Does not update the database.
-
-        :param a: The id of the first card
-        :param b: The id of the second card
-        :return: `ObjectId` of the newly merged card
-        '''
-        self[a].update(self[b])
-        del self[b]
-        return a
-
-    def update(self, cards:List[Card]):
+    def update(self, cards:List[CardModel]):
         '''
         Updates the collection with the given cards.
         Does not update the database.
 
-        :return: An Updated `Collection` object
+        :return: An updated `CollectionModel` object
         '''
         for card in cards:
             cid = card._id

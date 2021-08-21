@@ -1,4 +1,8 @@
-import os
+# from typing import Union
+
+from .card_condition import CardCondition
+from .card_operation import CardOperation
+
 
 def get_arg_list(parser):
     args = parser.parse_args()

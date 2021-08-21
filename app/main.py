@@ -2,9 +2,7 @@ from flask import redirect
 from flask_jwt_extended import jwt_required
 
 from . import app, api
-from .auth import UsersApi as AuthUsersApi, JwtApi
-from .users import UsersApi
-from .cards import CardsApi
+from .routes import AuthUsersApi, JwtApi, CollectionsApi, CardsApi
 
 
 @app.route('/')
@@ -24,12 +22,12 @@ def start_auth_endpoint():
 def start_cards_endpoint():
     api.add_resource(CardsApi, '/cards/sellers')
 
-def start_users_endpoint():
-    # api.add_resource(UsersApi, '/users/<string:user_id>')
-    api.add_resource(UsersApi, '/users')
+def start_collections_endpoint():
+    # api.add_resource(UsersApi, '/collections/<string:user_id>')
+    api.add_resource(CollectionsApi, '/collections')
 
 
 ## main
 start_auth_endpoint()
 start_cards_endpoint()
-start_users_endpoint() # change this route to `/collections` maybe?
+start_collections_endpoint()

@@ -8,8 +8,7 @@ from .. import mongo
 
 class CardsApi(Resource):
     '''
-    getInitialPhash() - get initial phash pickle file
-
     searchSellers(string q) - use `http://api.scryfall.com/cards/search?q={q}` to fetch cards matching the description and search for users selling them
     '''
+    #TODO all this shiz
     pass
