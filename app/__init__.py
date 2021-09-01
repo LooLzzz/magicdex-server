@@ -28,5 +28,9 @@ bcrypt = Bcrypt(app)
 api = Api(app)
 jwt = JWTManager(app)
 
+## mongodb collections
+users_db = mongo.db['users']
+collections_db = mongo.db['collections']
+
 ## start `main.py`
 from . import main

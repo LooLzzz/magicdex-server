@@ -1,103 +1,117 @@
-from typing import Iterable, Union, List
-from bson.objectid import ObjectId
+import json
+from typing import Iterable, Union, List, Dict
+from bson import ObjectId, json_util
 
-from .. import mongo
+from ..utils import CardOperation
+from .. import collections_db
 from . import CardModel
-
-users_db = mongo.db['users']
-collections_db = mongo.db['collections']
 
 
 class CollectionModel():
-    def __init__(self, user_id:Union[ObjectId, str]):
+    def __init__(self, parent):
         data = collections_db.find_one(
             # filter
-            { 'user_id': ObjectId(user_id) },
+            { 'user_id': ObjectId(parent.user_id) },
             {
                 # projection
-                '_id': '$_id',
-                'user_id': '$user_id',
+                '_id': 1,
+                'user_id': 1,
             }
         )
         if not data:
             raise ValueError('Collection does not exist')
 
+        self.parent = parent
+        self.user_id = self.parent.user_id
         self._id = data['_id']
-        self.user_id = data['user_id']
-        self._cards = {}
-        # self._cards = { card._id: card for card in [CardModel(parent=self, **item) for item in data['cards']] }
+        self.cards:Dict[ObjectId, CardModel] = {}
+        # self.cards = { card._id: card for card in [CardModel(parent=self, **item) for item in data['cards']] }
 
     def __getitem__(self, key):
-        if isinstance(key, str):
-            # single key
-            return self._cards[ObjectId(key)]
-        if isinstance(key, Iterable):
-            # multiple keys
+        if isinstance(key, (ObjectId, str)):
+            keys = [ ObjectId(key) ]
+        elif isinstance(key, (list, tuple)):
             keys = [ ObjectId(k) for k in key ]
-            return { k:v for k,v in self.items() if k in keys }
+        else: # if not isinstance(key, Iterable):
+            raise ValueError(f'Invalid key type {type(key)}')
+
+        for k in keys:
+            if k not in self.cards:
+                self.cards[k] = CardModel(self, _id=k, fetch_data_by_id=True)
+        res = { k:v for k,v in self.cards.items() if k in keys }
+        return res if isinstance(key, (list, tuple)) else list(res.values())[0]
 
     def __setitem__(self, key, value):
-        self._cards[ObjectId(key)] = value
+        self.cards[ObjectId(key)] = value
 
     def __delitem__(self, key):
-        del self._cards[ObjectId(key)]
+        del self.cards[ObjectId(key)]
 
     def __contains__(self, key):
-        return ObjectId(key) in self._cards
+        return ObjectId(key) in self.cards
 
     def __iter__(self):
-        return iter(self._cards)
-
+        return iter(self.cards)
+    
     def values(self):
-        return self._cards.values()
+        return self.cards.values()
+    
+    def items(self):
+        return self.cards.items()
     
     def keys(self):
-        return self._cards.keys()
-
-    def items(self):
-        return self._cards.items()
+        return self.cards.keys()
 
     def __repr__(self):
-        return repr(self._cards)
+        return repr(self.cards)
 
-    def to_JSON(self, mongo=False):
+    def to_JSON(self, to_mongo=False, drop_cols=[], cards_drop_cols=[]):
         '''
-        Converts the collection to a JSON, used for JSON serialization.
+        JSON representation of this `CollectionModel`, used for JSON serialization.
         '''
-        return {
-            '_id': self._id if mongo else str(self._id),
-            'user_id': self.user_id if mongo else str(self.user_id),
-            'cards': [ card.to_JSON(mongo) for card in self.values() ],
+        res = {
+            '_id': self._id if to_mongo else str(self._id),
+            # '_id': self._id if to_mongo else {'$oid': str(self._id)},
+            'user_id': self.parent.user_id if to_mongo else str(self.parent.user_id),
+            'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self.cards.values() ],
         }
+        return { k:v for k,v in res.items() if k not in drop_cols }
 
-    def find_cid(self, other:CardModel):
-        for card in self.values():
-            if card == other:
-                return card._id
-        return None
+    def load_all(self):
+        '''
+        Loads all cards from the database.
+        
+        :return: An updated `CollectionModel` object
+        '''
+        data = collections_db.find_one(
+            { 'user_id': ObjectId(self.parent.user_id) }, # filter
+            { 'cards': 1 } # projection
+        )
+        self.cards = { item['_id']: CardModel(self, **item) for item in data['cards'] }
+        return self
 
     @classmethod
-    def create(cls, user_id):
+    def create(cls, user_id:Union[ObjectId, str]):
         '''
         Creates a new collection and saves it to the database.
+
+        :param user_id: The id of the user that owns the collection
+        :returns: `InsertOneResult` object
         '''
-        user_id = ObjectId(user_id)
-        collections_db.insert_one({
-            'user_id': user_id,
+        return collections_db.insert_one({
+            'user_id': ObjectId(user_id),
             'cards': [],
         })
-        return cls(user_id)
 
     def save(self):
         '''
         Saves all changes to the collection to the database.
         
-        :return: `UpdateResult`
+        :return: List of jsonified `UpdateResult` objects
         '''
-        cards = [ card.to_JSON(mongo=True) for card in self.values() ]
-        newvalues = { "$set": {'cards':cards} }
-
-        res = collections_db.update_one({'_id': self._id}, newvalues, upsert=True)
+        res = []
+        for card in self.cards.values():
+            res += [ card.save() ]
         return res
     
     def clear(self):
@@ -107,68 +121,46 @@ class CollectionModel():
 
         :return: An updated `CollectionModel` object
         '''
-        self._cards.clear()
+        self.cards.clear()
         return self
-    
-    def add(self, card:CardModel):
-        if not card._id:
-            raise ValueError('Cannot add card without an id')
-        if card._id in self:
-            raise ValueError('Card id already exists in collection')
-        
-        card = card.none_values_to_default()
-        if card.amount > 0:
-            self[card._id] = card
-        # else:
-        #     raise ValueError('Card amount must be greater than 0')
-        
-        return self
-
-    # def merge(self, a:CardModel, b:CardModel):
-    #     '''
-    #     Merges two given cards into one card, result will be put into object `a`.
-    #     Does not update the database.
-
-    #     :param a: The id of the first card
-    #     :param b: The id of the second card
-    #     :return: `ObjectId` of the newly merged card
-    #     '''
-    #     a.update(b)
-    #     del self[b]
-    #     return a
 
     def update(self, cards:List[CardModel]):
         '''
         Updates the collection with the given cards.
         Does not update the database.
 
+        :param cards: A list of `CardModel` to be added or updated
         :return: An updated `CollectionModel` object
         '''
         for card in cards:
-            cid = card._id
-            if cid is None:
-                # test if the card already exists in the collection
-                # if it does, find its cid
-                # if not, generate a cid for it
-                cid = self.find_cid(card)
-                if cid is None:
-                    card.generate_id()
+            dup = card.find_duplicate()
+            if card._id is not None:
+                # a request to update a specific card id
+                if dup:
+                    if card._id == dup._id:
+                        # found the same card id as the request
+                        data = card.to_dict(drop_none=True)
+                        self[dup._id].update(**data)
+                    else:
+                        # found the same card as the request, but with a different id
+                        data = dup.to_dict(drop_none=True)
+                        self[card._id].update(**data) # keep the requested card
+                        self[dup._id].operation = CardOperation.DELETE # remove the duplicate
                 else:
-                    card._id = cid
-            
-            if cid in self:
-                card._id = None
-                another_cid = self.find_cid(card)
-                
-                if another_cid is None:
-                    # only one occurences of the card exists in the collection, update it
-                    self[cid].update(card)
-                else:
-                    # two occurences of the same card exist in the collection, merge and update it
-                    cid = self.merge(cid, another_cid)
-                    self[cid].update(card)
+                    # requested id doesnt exist
+                    card.operation = CardOperation.NOP
+                    self[card._id] = card
             else:
-                # card doesnt exist in the collection, add it
-                self.add(card)
+                # a request to update a card, the card could be an existing one or not
+                if dup:
+                    # found a card as requested
+                    data = card.to_dict(drop_none=True)
+                    self[dup._id].update(**data)
+                else:
+                    # card doesnt exist, create it
+                    card.generate_id()
+                    card.amount = int(card.amount)
+                    card.operation = CardOperation.CREATE
+                    self[card._id] = card
         
         return self

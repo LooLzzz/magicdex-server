@@ -24,7 +24,8 @@ def start_cards_endpoint():
 
 def start_collections_endpoint():
     # api.add_resource(UsersApi, '/collections/<string:user_id>')
-    api.add_resource(CollectionsApi, '/collections')
+    api.add_resource(CollectionsApi.Collection, '/collections')
+    api.add_resource(CollectionsApi.Card, '/collections/<string:card_id>')
 
 
 ## main

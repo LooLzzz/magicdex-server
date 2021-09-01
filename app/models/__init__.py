@@ -1,3 +1,3 @@
-from .cards import CardModel, Condition
+from .cards import CardModel
 from .collections import CollectionModel
 from .users import UserModel
