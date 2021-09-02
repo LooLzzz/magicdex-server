@@ -270,7 +270,7 @@ class CardModel():
         '''
         res = {
             '_id': str(self._id),
-            'operation': self.operation.to_past_tense()
+            'action': self.operation.to_past_tense()
         }
         if self.operation == CardOperation.NOP:
             res['msg'] = '`_id` not found in collection'

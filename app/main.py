@@ -16,16 +16,16 @@ def getInitialPhash():
 
 
 def start_auth_endpoint():
-    api.add_resource(AuthUsersApi, '/auth/users', endpoint='AuthUsersApi')
-    api.add_resource(JwtApi, '/auth/jwt')
+    api.add_resource(AuthUsersApi, '/auth/users', '/auth/users/', endpoint='AuthUsersApi')
+    api.add_resource(JwtApi, '/auth/jwt', '/auth/jwt/')
 
 def start_cards_endpoint():
-    api.add_resource(CardsApi, '/cards/sellers')
+    api.add_resource(CardsApi, '/cards/sellers', '/cards/sellers/')
 
 def start_collections_endpoint():
     # api.add_resource(UsersApi, '/collections/<string:user_id>')
-    api.add_resource(CollectionsApi.Collection, '/collections')
-    api.add_resource(CollectionsApi.Card, '/collections/<string:card_id>')
+    api.add_resource(CollectionsApi.Collection, '/collections', '/collections/')
+    api.add_resource(CollectionsApi.Card, '/collections/<string:card_id>', '/collections/<string:card_id>/')
 
 
 ## main

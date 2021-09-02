@@ -2,5 +2,7 @@
 .venv/
 .env
 
+.markdownlint.json
+
 __pycache__/
 *.pyc

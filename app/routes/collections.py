@@ -8,7 +8,7 @@ from flask_restful.reqparse import RequestParser
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # from .. import users_db, collections_db
-from ..utils import get_arg_dict
+from ..utils import get_arg_dict, CardOperation
 from ..models import UserModel, CardModel
 
 collection_parser = RequestParser(bundle_errors=True)
@@ -70,7 +70,7 @@ class CollectionsApi():
 
             return user.collection \
                     .load_all() \
-                    .to_JSON()
+                    .to_JSON()['cards']
 
         @jwt_required()
         def delete(self):
@@ -122,5 +122,5 @@ class CollectionsApi():
             user = UserModel(user_id)
             
             card = user.collection[card_id]
-            card.amount = -1
+            card.CardCondition = CardOperation.DELETE
             return card.save()

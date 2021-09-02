@@ -67,10 +67,10 @@ class CardCondition(_BaseEnum):
                 return cls(int(value))
             except ValueError:
                 value = value \
-                        .upper() \
                         .replace(' ', '_') \
                         .replace('-', '_') \
-                        .split('_')
-                value = ''.join([ word[0] for word in value ]) # `NEAR_MINT` -> `NM`
+                        .upper()
+                if '_' in value:
+                    value = ''.join([ word[0] for word in value.split('_') ]) # `NEAR_MINT` -> `NM`
                 return cls[value]
         raise EnumParsingError(f'Unable to parse value to Condition Enum: {value}')

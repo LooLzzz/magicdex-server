@@ -26,6 +26,7 @@ class CollectionModel():
         self._id = data['_id']
         self.cards:Dict[ObjectId, CardModel] = {}
         # self.cards = { card._id: card for card in [CardModel(parent=self, **item) for item in data['cards']] }
+        self.clear_db = False
 
     def __getitem__(self, key):
         if isinstance(key, (ObjectId, str)):
@@ -72,7 +73,7 @@ class CollectionModel():
         res = {
             '_id': self._id if to_mongo else str(self._id),
             # '_id': self._id if to_mongo else {'$oid': str(self._id)},
-            'user_id': self.parent.user_id if to_mongo else str(self.parent.user_id),
+            'user_id': self.user_id if to_mongo else str(self.user_id),
             'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self.cards.values() ],
         }
         return { k:v for k,v in res.items() if k not in drop_cols }
@@ -84,7 +85,7 @@ class CollectionModel():
         :return: An updated `CollectionModel` object
         '''
         data = collections_db.find_one(
-            { 'user_id': ObjectId(self.parent.user_id) }, # filter
+            { 'user_id': ObjectId(self.user_id) }, # filter
             { 'cards': 1 } # projection
         )
         self.cards = { item['_id']: CardModel(self, **item) for item in data['cards'] }
@@ -107,21 +108,39 @@ class CollectionModel():
         '''
         Saves all changes to the collection to the database.
         
-        :return: List of jsonified `UpdateResult` objects
+        :return: List of result objects
         '''
         res = []
-        for card in self.cards.values():
-            res += [ card.save() ]
+        
+        if self.clear_db:
+            self.clear_db = False
+            cards = collections_db.find_one_and_update(
+                { '_id': ObjectId(self._id) },
+                { '$set': { 'cards': [] } }
+            )['cards']
+            # self.cards = { item['_id']:CardModel(parent=self, operation=CardOperation.DELETE, **item) for item in cards }
+            for item in cards:
+                res += [{
+                    '_id': item['_id'],
+                    'action': 'DELETED'
+                }]
+        else:
+            for card in self.cards.values():
+                res += [ card.save() ]
+        
         return res
     
     def clear(self):
         '''
-        Clears the collection.
-        Does not update the database.
+        Clears the collection from the database.
+        Does not update the database by itself.
+        `.save()` should be called in order to update the database.
 
         :return: An updated `CollectionModel` object
         '''
-        self.cards.clear()
+        # self.cards.clear()
+        self.clear_db = True
+
         return self
 
     def update(self, cards:List[CardModel]):

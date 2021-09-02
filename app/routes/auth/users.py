@@ -19,7 +19,8 @@ class AuthUsersApi(Resource):
         try:
             if user.check_password_hash(args['password']):
                 return {
-                    'msg': f'successfuly logged in as {args["username"]}',
+                    'msg': f'successfuly logged in',
+                    'username': args['username'],
                     'access-token': user.create_access_token()
                 }
             else:
