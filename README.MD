@@ -9,7 +9,30 @@ Feel free to contact me for any question.
 
 ---
 
-## Authentication Endpoint ##
+## API Overview ##
+
+* [Authentication](#authentication)
+    * `/auth/users`
+        * `GET`: Login using a username and password combination.
+        * `POST`, `PUT`: Register a new user.
+    * `/auth/jwt`
+        * `GET`: Login using an access token.
+* [Collections](#collections)
+    * `/collections`
+        * `GET`: Retrieve all cards from active user's collection.
+        * `POST`, `PUT`: Insert/update cards in active user's collection.
+        * `DELETE`: Clear active user's collection.
+    * `/collections/<:card_id>`
+        * `GET`: Retrieve a specific card from active user's collection.
+        * `POST`: Update a specific card in active user's collection.
+        * `DELETE`: Delete a specific card from active user's collection.
+* [Cards](#cards)
+    * `/cards/phash`
+        * `GET`: Retrieves an initial phash pickle file.
+
+---
+
+## Authentication Endpoint <a name="authentication"></a> ##
 
 ### Register ###
 
@@ -78,7 +101,7 @@ Response:
 
 ---
 
-## Collections Endpoint ##
+## Collections Endpoint <a name="collections"></a> ##
 
 ### Get All Cards ###
 
@@ -161,8 +184,6 @@ Response:
 | Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
 | cards | JSON Body | `List[Card]` | List of cards to be updated or inserted into collection. When inserting a new card, `_id` field should be empty. |
 
-## Cards Endpoint ##
-
 ### Update A Card ###
 
 Updates a specific card in the *active* user's collection.
@@ -191,14 +212,14 @@ Response:
 | altered | JSON Body | `bool` | Is card altered? |
 | misprint | JSON Body | `bool` | Is card a misprint? |
 
-- **Note: if `card.amount` will be set to a values lower than or equal to 0, the card will be removed from the collection instead.**
+* **Note: if `card.amount` will be set to a values lower than or equal to 0, the card will be removed from the collection instead.**
 
 ### Get A Card ###
 
 Retrieves a specific card in the *active* user's collection.
 
 ```
-GET /cards/<card_id> HTTP/1.1
+GET /cards/<:card_id> HTTP/1.1
 
 Response:
 {
@@ -222,6 +243,8 @@ Response:
 | Name     | Location   | Type       | Description |
 |----------|------------|------------|-------------|
 | Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+
+## Cards Endpoint <a name="cards"></a> ##
 
 ### Request Initial Phash Pickle ####
 
