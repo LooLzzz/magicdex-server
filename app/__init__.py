@@ -7,7 +7,6 @@ from flask_pymongo import PyMongo
 from flask_restful import Api
 from flask_sslify import SSLify
 
-
 ## load `.env` file if exists
 env_filepath = dotenv.find_dotenv('.env')
 if os.path.exists(env_filepath):
@@ -28,6 +27,10 @@ mongo = PyMongo(app, tlsCAFile=certifi.where())
 bcrypt = Bcrypt(app)
 api = Api(app)
 jwt = JWTManager(app)
+
+## mongodb collections
+users_db = mongo.db['users']
+collections_db = mongo.db['collections']
 
 ## start `main.py`
 from . import main
