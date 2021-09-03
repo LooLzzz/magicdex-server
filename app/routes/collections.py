@@ -121,6 +121,7 @@ class CollectionsApi():
             user_id, username = get_jwt_identity()
             user = UserModel(user_id)
             
-            card = user.collection[card_id]
-            card.CardCondition = CardOperation.DELETE
-            return card.save()
+            return user \
+                    .collection[card_id] \
+                    .delete() \
+                    .save()

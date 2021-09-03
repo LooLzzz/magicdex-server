@@ -1,5 +1,8 @@
 # Magicdex Server API #
 
+![version](https://img.shields.io/badge/version-pre--alpha-blue)  
+![build](https://img.shields.io/badge/build-passing-green)
+
 **This project is a WIP**
 
 ## Info ##
@@ -182,7 +185,13 @@ Response:
 | Name     | Location   | Type       | Description |
 |----------|------------|------------|-------------|
 | Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
-| cards | JSON Body | `List[Card]` | List of cards to be updated or inserted into collection. When inserting a new card, `_id` field should be empty. |
+| cards | JSON Body | `List[Card]` | List of cards to be updated or inserted into collection. *See notes below*. |
+
+**Notes:**
+* Should be a list of cards, each object can contain any number of fields from `Update A Card` section.
+* When inserting a new card:
+    * `_id` field should be empty.
+    * If a field is not present or `null`, it's default value will be used instead.
 
 ### Update A Card ###
 
@@ -200,17 +209,17 @@ Response:
 
 #### Parameters ####
 
-| Name     | Location   | Type       | Description |
-|----------|------------|------------|-------------|
-| Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
-| scryfall_id | JSON Body | `string` | Scryfall's id for the card |
-| amount | JSON Body | `int` \| `string` | Amount of copies of the same card. Can be a number for a set value or a string in the form of `"+X"`/`"-X"` for addition/subtraction. *See note below*. |
-| tag | JSON Body | `Array[string]` | List of tags for the card. |
-| condition | JSON Body | `stringEnum[NM, LP, MP, HP, DAMAGED]` | Card condition, one of: `{Near-Mint, Lightly-Played, Moderately-Played, Heavily-Played, Damaged}` |
-| foil | JSON Body | `bool` | Is card a foil? |
-| signed | JSON Body | `bool` | Is card signed? |
-| altered | JSON Body | `bool` | Is card altered? |
-| misprint | JSON Body | `bool` | Is card a misprint? |
+| Name     | Location   | Type       | Default Value | Description |
+|----------|------------|------------|-------------|-------------|
+| Authorization | Header | `Bearer Access-Token` | - | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+| scryfall_id | JSON Body | `string` | - | Scryfall's id for the card |
+| amount | JSON Body | `int` \| `string` | "+1" | Amount of copies of the same card. Can be a number for a set value or a string in the form of `"+X"`/`"-X"` for addition/subtraction. *See note below*. |
+| tag | JSON Body | `Array[string]` | \[ ] | List of tags for the card. |
+| condition | JSON Body | `stringEnum[NM, LP, MP, HP, DAMAGED]` | "NM" | Card condition, one of: `{Near-Mint, Lightly-Played, Moderately-Played, Heavily-Played, Damaged}` |
+| foil | JSON Body | `bool` | false | Is card a foil? |
+| signed | JSON Body | `bool` | false | Is card signed? |
+| altered | JSON Body | `bool` | false | Is card altered? |
+| misprint | JSON Body | `bool` | false | Is card a misprint? |
 
 * **Note: if `card.amount` will be set to a values lower than or equal to 0, the card will be removed from the collection instead.**
 

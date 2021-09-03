@@ -206,6 +206,14 @@ class CardModel():
 
         return self
 
+    def delete(self):
+        '''
+        Marks this `CardModel` instance to be deleted from the collection.
+        Does not update the database.
+        '''
+        self.operation = CardOperation.DELETE
+        return self
+
     def _create(self):
         '''
         Creates a new `CardModel` instance in the database.
@@ -263,7 +271,7 @@ class CardModel():
     def save(self):
         '''
         Saves this `CardModel` instance to the database.
-        Calls `._create()`, `._update()`, `._delete()` respectively
+        Calls `_create()`, `_update()` or `_delete()` internally.
         
         :raises Exception: If the operation fails
         :return: A Dictionary containing operation info
