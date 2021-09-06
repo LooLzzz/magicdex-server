@@ -227,6 +227,9 @@ class CardModel():
             {
                 '$push': {
                     'cards': self.to_JSON(to_mongo=True)
+                },
+                '$inc': {
+                    'cards_count': 1
                 }
             }
         )
@@ -246,6 +249,9 @@ class CardModel():
                     'cards': {
                         '_id': self._id # card_id
                     }
+                },
+                '$inc': {
+                    'cards_count': -1
                 }
             }
         )

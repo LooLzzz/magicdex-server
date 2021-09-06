@@ -1,4 +1,4 @@
-import json
+import re, json
 # from typing import Union, List, Dict
 
 from .errors import BooleanParsingError
@@ -9,9 +9,12 @@ def get_arg_list(parser):
     return list(args.values())
 
 def get_arg_dict(parser):
-    res = parser.parse_args()
-    res = dictkeys_to_lower(res)
-    res = str(res) \
+    kwargs = parser.parse_args()
+    return dictkeys_to_lower(kwargs)
+
+def to_json(value):
+    return json.loads(
+        value \
             .replace("\\n", '') \
             .replace("\n", '')  \
             .replace("'", '"')  \
@@ -19,13 +22,7 @@ def get_arg_dict(parser):
             .replace('}"', '}') \
             .replace('"[', '[') \
             .replace(']"', ']')
-    res = json.loads(res)
-    for k,v in res.items():
-        try:
-            res[k] = to_bool(v)
-        except BooleanParsingError as e:
-            pass
-    return res
+    )
 
 def dictkeys_to_lower(d:dict):
     return { k: v for k,v in d.items() }
@@ -38,3 +35,11 @@ def to_bool(s):
         return False
     else:
         raise BooleanParsingError(f'`{s}` cannot be parsed as boolean')
+
+def to_amount(value:str):
+    if re.match(r'^[+\-][1-9][0-9]*', value): # look for '+X' or '-X'
+        return value
+    try: # look for 'X'
+        return int(value)
+    except ValueError:
+        raise ValueError(f'this field should be the in form of one of the following: {{X, +X, -X}} where X is an integer')

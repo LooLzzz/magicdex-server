@@ -6,8 +6,8 @@ from ...utils import UserAlreadyExists, UserDoesNotExist, get_arg_dict #, get_ar
 from ...models import UserModel
 
 parser = RequestParser(bundle_errors=True)
-parser.add_argument('username', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=False)
-parser.add_argument('password', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=True)
+parser.add_argument('username', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=False, type=str)
+parser.add_argument('password', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=True, type=str)
 
 
 class AuthUsersApi(Resource):

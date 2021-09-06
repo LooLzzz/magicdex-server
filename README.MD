@@ -17,14 +17,16 @@ Feel free to contact me for any question.
 * [Authentication](#authentication)
     * `/auth/users`
         * `GET`: Login using a username and password combination.
-        * `POST`, `PUT`: Register a new user.
+        * `PUT`: Register a new user.
     * `/auth/jwt`
         * `GET`: Login using an access token.
 * [Collections](#collections)
     * `/collections`
-        * `GET`: Retrieve all cards from active user's collection.
-        * `POST`, `PUT`: Insert/update cards in active user's collection.
+        * `GET`: Retrieve cards from active user's collection.
+        * `PUT`, `POST`: Insert/update cards in active user's collection.
         * `DELETE`: Clear active user's collection.
+    * `/collections/all`
+        * `GET`: Retrieve **all** cards from active user's collection.
     * `/collections/<:card_id>`
         * `GET`: Retrieve a specific card from active user's collection.
         * `POST`: Update a specific card in active user's collection.
@@ -42,7 +44,6 @@ Feel free to contact me for any question.
 Register a new user.
 
 ```
-POST /auth/users HTTP/1.1
 PUT /auth/users HTTP/1.1
 
 Response:
@@ -106,31 +107,77 @@ Response:
 
 ## Collections Endpoint <a name="collections"></a> ##
 
-### Get All Cards ###
+### Get Cards ###
 
-Retrieves a list of all cards in the *active* user's collection.
+Retrieves a list of cards in the *active* user's collection.  
+Supports pagination.
 
 ```
 GET /collections HTTP/1.1
 
 Response:
-[
-    {
-        "_id": {:string},
-        "scryfall_id": {:string},
-        "amount": {:int},
-        "tag": [
-            {:string},
-            ...
-        ],
-        "condition": {:stringEnum[NM, LP, MP, HP, DAMAGED]},
-        "foil": {:bool},
-        "signed": {:bool},
-        "altered": {:bool},
-        "misprint": {:bool}
-    },
-    {...},
-]
+{
+    "page": {:int},
+    "per_page": {:int},
+    "total": {:int}, /* only present in the first page */
+    "next_page": {:stringUrl}, /* not present in the last page */
+    "data": [
+        {
+            "_id": {:string},
+            "scryfall_id": {:string},
+            "amount": {:int},
+            "tag": [
+                {:string},
+                ...
+            ],
+            "condition": {:stringEnum[NM, LP, MP, HP, DAMAGED]},
+            "foil": {:bool},
+            "signed": {:bool},
+            "altered": {:bool},
+            "misprint": {:bool}
+        },
+        {...},
+    ]
+}
+```
+
+#### Parameters ####
+
+| Name     | Location   | Type       | Default Value | Description |
+|----------|------------|------------|---------------|-------------|
+| Authorization | Header | `Bearer Access-Token` | - | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+| page      | JSON Body / URL Arguments | `int`  | `1`  | Pagination page number, indexing starts from 1 |
+| per_page  | JSON Body / URL Arguments | `int`  | `20` | Amount of cards per page |
+
+### Get All Cards ###
+
+Retrieves all cards in the *active* user's collection.  
+Does not use pagination.
+
+```
+GET /collections/all HTTP/1.1
+
+Response:
+{
+    "total": {:int},
+    "data": [
+        {
+            "_id": {:string},
+            "scryfall_id": {:string},
+            "amount": {:int},
+            "tag": [
+                {:string},
+                ...
+            ],
+            "condition": {:stringEnum[NM, LP, MP, HP, DAMAGED]},
+            "foil": {:bool},
+            "signed": {:bool},
+            "altered": {:bool},
+            "misprint": {:bool}
+        },
+        {...},
+    ]
+}
 ```
 
 #### Parameters ####
@@ -188,6 +235,7 @@ Response:
 | cards | JSON Body | `List[Card]` | List of cards to be updated or inserted into collection. *See notes below*. |
 
 **Notes:**
+
 * Should be a list of cards, each object can contain any number of fields from `Update A Card` section.
 * When inserting a new card:
     * `_id` field should be empty.
@@ -213,15 +261,15 @@ Response:
 |----------|------------|------------|-------------|-------------|
 | Authorization | Header | `Bearer Access-Token` | - | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
 | scryfall_id | JSON Body | `string` | - | Scryfall's id for the card |
-| amount | JSON Body | `int` \| `string` | "+1" | Amount of copies of the same card. Can be a number for a set value or a string in the form of `"+X"`/`"-X"` for addition/subtraction. *See note below*. |
-| tag | JSON Body | `Array[string]` | \[ ] | List of tags for the card. |
-| condition | JSON Body | `stringEnum[NM, LP, MP, HP, DAMAGED]` | "NM" | Card condition, one of: `{Near-Mint, Lightly-Played, Moderately-Played, Heavily-Played, Damaged}` |
-| foil | JSON Body | `bool` | false | Is card a foil? |
-| signed | JSON Body | `bool` | false | Is card signed? |
-| altered | JSON Body | `bool` | false | Is card altered? |
-| misprint | JSON Body | `bool` | false | Is card a misprint? |
+| amount | JSON Body | `int` \| `string` | `"+1"` | Amount of copies of the same card. Can be a number for a set value or a string in the form of `"+X"`/`"-X"` for addition/subtraction. *See note below*. |
+| tag | JSON Body | `Array[string]` | `[]` | List of tags for the card. |
+| condition | JSON Body | `stringEnum[NM, LP, MP, HP, DAMAGED]` | `"NM"` | Card condition, one of: `{Near-Mint, Lightly-Played, Moderately-Played, Heavily-Played, Damaged}` |
+| foil | JSON Body | `bool` | `false` | Is card a foil? |
+| signed | JSON Body | `bool` | `false` | Is card signed? |
+| altered | JSON Body | `bool` | `false` | Is card altered? |
+| misprint | JSON Body | `bool` | `false` | Is card a misprint? |
 
-* **Note: if `card.amount` will be set to a values lower than or equal to 0, the card will be removed from the collection instead.**
+* **Note: if `card.amount` will be set to a value lower than or equal to 0, the card will be removed from the collection instead.**
 
 ### Get A Card ###
 

@@ -1,29 +1,33 @@
-import re, json
+import os, re, json
 from flask import abort, jsonify, make_response
 from typing import Union, List
-from bson import ObjectId
 from bson.errors import InvalidId
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # from .. import users_db, collections_db
-from ..utils import get_arg_dict, CardOperation
+from ..utils import get_arg_dict, get_arg_list, to_json, to_bool, to_amount, CardCondition
 from ..models import UserModel, CardModel
 
 collection_parser = RequestParser(bundle_errors=True)
-collection_parser.add_argument('cards', location=['form', 'args', 'json'], case_sensitive=False)
+collection_parser.add_argument('cards', location=['form', 'args', 'json'], case_sensitive=False, type=to_json)
+
+get_all_parser = RequestParser(bundle_errors=True)
+get_all_parser.add_argument('page',     location=['form', 'args', 'json'], case_sensitive=False, default=1,     type=int)
+get_all_parser.add_argument('per_page', location=['form', 'args', 'json'], case_sensitive=False, default=20,    type=int)
+# get_all_parser.add_argument('all',      location=['form', 'args', 'json'], case_sensitive=False, default=False, type=to_bool)
+
 
 card_parser = RequestParser(bundle_errors=True)
-card_parser.add_argument('scryfall_id', location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('amount',      location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('tag',         location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('foil',        location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('condition',   location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('signed',      location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('altered',     location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-card_parser.add_argument('misprint',    location=['form', 'args', 'json'], case_sensitive=False, store_missing=False)
-
+card_parser.add_argument('scryfall_id', location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=str)
+card_parser.add_argument('amount',      location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_amount)
+card_parser.add_argument('tag',         location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_json)
+card_parser.add_argument('foil',        location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_bool)
+card_parser.add_argument('condition',   location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=CardCondition.parse)
+card_parser.add_argument('signed',      location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_bool)
+card_parser.add_argument('altered',     location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_bool)
+card_parser.add_argument('misprint',    location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_bool)
 
 def data_validator(parser):
     def wrapper(func):
@@ -33,7 +37,7 @@ def data_validator(parser):
             
             try:
                 if card_id is not None:
-                    card = user.collection[card_id]
+                    card = user.collection[card_id] # will throw an exception if card_id is not found
                 kwargs = get_arg_dict(parser)
                 if not kwargs:
                     abort(make_response(
@@ -44,7 +48,10 @@ def data_validator(parser):
                     kwargs['cards'] = [ CardModel(parent=user.collection, **item) for item in kwargs['cards'] ]
             except (InvalidId, KeyError) as e:
                 abort(make_response(
-                    jsonify({ 'msg':'card not found', 'errors':e.args }),
+                    jsonify({
+                        'msg': 'card not found',
+                        'errors':e.args 
+                    }),
                     404
                 ))
             
@@ -56,7 +63,27 @@ def data_validator(parser):
 
 
 class CollectionsApi():
-    class Collection(Resource):
+
+    @classmethod
+    @jwt_required()
+    def load_all(cls):
+        '''
+        Loads all cards from the database.
+        
+        :return: JSON object
+        '''
+        user_id, username = get_jwt_identity()
+        user = UserModel(user_id)
+
+        data = user.collection \
+                .load_all() \
+                .to_JSON()
+        return {
+            'total': data['cards_count'],
+            'data': data['cards']
+        }
+
+    class Collections(Resource):
         '''
         * get - get collection
         * delete - clear collection
@@ -67,10 +94,27 @@ class CollectionsApi():
         def get(self):
             user_id, username = get_jwt_identity()
             user = UserModel(user_id)
+            kwargs = get_arg_dict(get_all_parser)
+            page, per_page = kwargs.values()
 
-            return user.collection \
-                    .load_all() \
-                    .to_JSON()['cards']
+            data = user.collection \
+                    .load(**kwargs) \
+                    .to_JSON()
+            res = {
+                **kwargs,
+                'data': data['cards']
+            }
+
+            if page == 1:
+                # show total card count on the first page
+                res['total'] = data['cards_count']
+            if page * per_page < data['cards_count']:
+                # show url for the next page if there are cards left to show
+                kwargs['page'] += 1
+                args = '&'.join([ f'{k}={repr(v)}' for k,v in kwargs.items() ])
+                res['next_page'] = f'{os.environ["APP_URL"]}/collections?{args}'
+            
+            return res
 
         @jwt_required()
         def delete(self):
@@ -96,7 +140,7 @@ class CollectionsApi():
                     .save()
 
 
-    class Card(Resource):
+    class Cards(Resource):
         @jwt_required()
         def get(self, card_id:str):
             user_id, username = get_jwt_identity()
@@ -113,7 +157,7 @@ class CollectionsApi():
                     .update(**kwargs) \
                     .save()
 
-            cols = ['_id'] + list(kwargs)
+            cols = ['_id'] + list(kwargs.keys())
             return { k:v for k,v in user.collection[card_id].to_JSON().items() if k in cols }
         
         @jwt_required()

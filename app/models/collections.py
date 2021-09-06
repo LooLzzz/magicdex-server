@@ -1,4 +1,6 @@
-import json
+import json, os
+from flask import abort, jsonify, make_response, request
+from urllib.parse import urlparse
 from typing import Iterable, Union, List, Dict
 from bson import ObjectId, json_util
 
@@ -21,6 +23,7 @@ class CollectionModel():
         if not data:
             raise ValueError('Collection does not exist')
 
+        self._count = None
         self.parent = parent
         self.user_id = self.parent.user_id
         self._id = data['_id']
@@ -74,10 +77,56 @@ class CollectionModel():
             '_id': self._id if to_mongo else str(self._id),
             # '_id': self._id if to_mongo else {'$oid': str(self._id)},
             'user_id': self.user_id if to_mongo else str(self.user_id),
+            'cards_count': self.count(),
             'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self.cards.values() ],
         }
         return { k:v for k,v in res.items() if k not in drop_cols }
 
+    def count(self):
+        '''
+        Retrieves the number of cards in the collection from the database.
+        
+        :return: Number of cards in the collection
+        '''
+        data = collections_db.find_one(
+            { 'user_id': ObjectId(self.user_id) }, # filter
+            { 'cards_count': 1 } # projection
+        )
+        return data['cards_count']
+
+    def load(self, page:int=1, per_page:int=20):
+        '''
+        Loads cards from the database.
+
+        :param page: Page number
+        :param per_page: Number of cards per page
+        :return: An updated `CollectionModel` object
+        '''
+        skip = (page - 1) * per_page
+        # last_item = skip + per_page
+
+        data = collections_db.find_one(
+            { 'user_id': ObjectId(self.user_id) }, # filter
+            {
+                'cards': { '$slice': [ skip, per_page ] },
+                'cards_count': 1
+            }
+        )
+        if data['cards']:
+            self.cards = { item['_id']: CardModel(self, **item) for item in data['cards'] }
+        elif data['cards_count'] > 0:
+            abort(make_response(
+                jsonify({
+                    'msg': 'pagination page out of bounds',
+                    # 'back_to_start': f'http://{urlparse(request.base_url).hostname}/collections?page=1',
+                    # 'back_to_start': request.host_url + 'collections?page=1',
+                    'first_page': f'{os.environ["APP_URL"]}/collections?page=1&per_page={per_page}',
+                    'data': []
+                }),
+                200
+            ))
+        return self
+    
     def load_all(self):
         '''
         Loads all cards from the database.
