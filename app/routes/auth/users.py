@@ -1,6 +1,5 @@
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
-from flask_jwt_extended import create_access_token
 
 from ...utils import UserAlreadyExists, UserDoesNotExist, get_arg_dict #, get_arg_list
 from ...models import UserModel
@@ -11,17 +10,25 @@ parser.add_argument('password', location=['form', 'args', 'json'], required=True
 
 
 class AuthUsersApi(Resource):
+    '''
+    ## `/auth/jwt` ENDPOINT
+
+    ### GET
+    Login using a username and password combination.
+    
+    ### PUT
+    Register a new user a username and password combination.
+    '''
     def get(self):
-        '''login endpoint'''
-        args = get_arg_dict(parser)
-        user = UserModel(username=args['username'])
+        kwargs = get_arg_dict(parser)
+        user = UserModel(username=kwargs['username'])
 
         try:
-            if user.check_password_hash(args['password']):
+            if user.check_password_hash(kwargs['password']):
                 return {
                     'msg': f'successfuly logged in',
-                    'username': args['username'],
-                    'access-token': user.create_access_token()
+                    'username': kwargs['username'],
+                    'access-token': user.create_access_token() # will raise an exception if the user does not exist
                 }
             else:
                 raise UserDoesNotExist
@@ -30,22 +37,18 @@ class AuthUsersApi(Resource):
                 { 'msg': 'username and password combination not found' },
                 401
             )
-            
-    def post(self):
-        return self.put()
-    
+       
     def put(self):
-        '''register endpoint'''
-        args = get_arg_dict(parser)
-        user = UserModel(username=args['username'])
+        kwargs = get_arg_dict(parser)
+        user = UserModel(username=kwargs['username'])
         
         try:
-            user = user.create(args['password'])
+            user = user.create(kwargs['password'])
             return (
                 {
                     'msg': 'user created',
-                    'username': args['username'],
-                    'access-token': create_access_token(identity=(str(user.user_id), args['username']))
+                    'username': kwargs['username'],
+                    'access-token': user.create_access_token()
                 },
                 201
             )
@@ -53,7 +56,7 @@ class AuthUsersApi(Resource):
             return (
                 {
                     'msg': 'username already exists',
-                    'username': args['username'],
+                    'username': kwargs['username'],
                 },
                 400
             )

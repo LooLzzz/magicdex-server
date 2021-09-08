@@ -5,28 +5,26 @@ from typing import Iterable, Union, List, Dict
 from bson import ObjectId, json_util
 
 from ..utils import CardOperation
-from .. import collections_db
+from .. import cards_db
 from . import CardModel
 
 
 class CollectionModel():
     def __init__(self, parent):
-        data = collections_db.find_one(
-            # filter
-            { 'user_id': ObjectId(parent.user_id) },
-            {
-                # projection
-                '_id': 1,
-                'user_id': 1,
-            }
-        )
-        if not data:
-            raise ValueError('Collection does not exist')
+        # data = collections_db.find_one(
+        #     { 'user_id': ObjectId(parent.user_id) }, # filter
+        #     {
+        #         # projection
+        #         '_id': 1,
+        #         'user_id': 1,
+        #     }
+        # )
+        # if not data:
+        #     raise ValueError('Collection does not exist')
 
-        self._count = None
         self.parent = parent
         self.user_id = self.parent.user_id
-        self._id = data['_id']
+        # self._id = data['_id']
         self.cards:Dict[ObjectId, CardModel] = {}
         # self.cards = { card._id: card for card in [CardModel(parent=self, **item) for item in data['cards']] }
         self.clear_db = False
@@ -69,30 +67,27 @@ class CollectionModel():
     def __repr__(self):
         return repr(self.cards)
 
+    def inc_doc_count(self, amount:int):
+        '''
+        Increments the number of document cards in the collection by `amount`.
+
+        :param amount: The amount to increment
+        :return: The new document count
+        '''
+        return self.parent.inc_doc_count(amount)
+
     def to_JSON(self, to_mongo=False, drop_cols=[], cards_drop_cols=[]):
         '''
         JSON representation of this `CollectionModel`, used for JSON serialization.
         '''
         res = {
-            '_id': self._id if to_mongo else str(self._id),
+            # '_id': self._id if to_mongo else str(self._id),
             # '_id': self._id if to_mongo else {'$oid': str(self._id)},
             'user_id': self.user_id if to_mongo else str(self.user_id),
-            'cards_count': self.count(),
+            'doc_count': self.parent.doc_count(),
             'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self.cards.values() ],
         }
         return { k:v for k,v in res.items() if k not in drop_cols }
-
-    def count(self):
-        '''
-        Retrieves the number of cards in the collection from the database.
-        
-        :return: Number of cards in the collection
-        '''
-        data = collections_db.find_one(
-            { 'user_id': ObjectId(self.user_id) }, # filter
-            { 'cards_count': 1 } # projection
-        )
-        return data['cards_count']
 
     def load(self, page:int=1, per_page:int=20):
         '''
@@ -102,19 +97,9 @@ class CollectionModel():
         :param per_page: Number of cards per page
         :return: An updated `CollectionModel` object
         '''
-        skip = (page - 1) * per_page
-        # last_item = skip + per_page
+        skip_amount = (page - 1) * per_page
 
-        data = collections_db.find_one(
-            { 'user_id': ObjectId(self.user_id) }, # filter
-            {
-                'cards': { '$slice': [ skip, per_page ] },
-                'cards_count': 1
-            }
-        )
-        if data['cards']:
-            self.cards = { item['_id']: CardModel(self, **item) for item in data['cards'] }
-        elif data['cards_count'] > 0:
+        if skip_amount >= self.parent.doc_count():
             abort(make_response(
                 jsonify({
                     'msg': 'pagination page out of bounds',
@@ -125,6 +110,12 @@ class CollectionModel():
                 }),
                 200
             ))
+        else:
+            data = cards_db \
+                .find({ 'user_id': ObjectId(self.user_id) }) \
+                .skip(skip_amount) \
+                .limit(per_page)
+            self.cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
     
     def load_all(self):
@@ -133,11 +124,10 @@ class CollectionModel():
         
         :return: An updated `CollectionModel` object
         '''
-        data = collections_db.find_one(
-            { 'user_id': ObjectId(self.user_id) }, # filter
-            { 'cards': 1 } # projection
+        data = cards_db.find(
+            { 'user_id': ObjectId(self.user_id) }
         )
-        self.cards = { item['_id']: CardModel(self, **item) for item in data['cards'] }
+        self.cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
 
     @classmethod
@@ -148,10 +138,11 @@ class CollectionModel():
         :param user_id: The id of the user that owns the collection
         :returns: `InsertOneResult` object
         '''
-        return collections_db.insert_one({
-            'user_id': ObjectId(user_id),
-            'cards': [],
-        })
+        return { 'msg': '`CollectionModel.create()` method is deprecated' }
+        # return collections_db.insert_one({
+        #     'user_id': ObjectId(user_id),
+        #     'cards': [],
+        # })
 
     def save(self):
         '''
@@ -163,11 +154,15 @@ class CollectionModel():
         
         if self.clear_db:
             self.clear_db = False
-            cards = collections_db.find_one_and_update(
-                { '_id': ObjectId(self._id) },
-                { '$set': { 'cards': [] } }
-            )['cards']
-            # self.cards = { item['_id']:CardModel(parent=self, operation=CardOperation.DELETE, **item) for item in cards }
+            cards = cards_db.find(
+                { 'user_id': ObjectId(self.user_id) },
+                { '_id': 1 }
+            )
+            delete_res = cards_db.delete_many({
+                '_id': {
+                    '$in': [ item['_id'] for item in cards ]
+                }
+            })
             for item in cards:
                 res += [{
                     '_id': item['_id'],
@@ -187,9 +182,7 @@ class CollectionModel():
 
         :return: An updated `CollectionModel` object
         '''
-        # self.cards.clear()
         self.clear_db = True
-
         return self
 
     def update(self, cards:List[CardModel]):
@@ -203,21 +196,25 @@ class CollectionModel():
         for card in cards:
             dup = card.find_duplicate()
             if card._id is not None:
-                # a request to update a specific card id
+                # a request to update a specific card_id
                 if dup:
                     if card._id == dup._id:
-                        # found the same card id as the request
+                        # found the same card_id as the request
                         data = card.to_dict(drop_none=True)
                         self[dup._id].update(**data)
                     else:
                         # found the same card as the request, but with a different id
                         data = dup.to_dict(drop_none=True)
                         self[card._id].update(**data) # keep the requested card
-                        self[dup._id].operation = CardOperation.DELETE # remove the duplicate
+                        self[dup._id].delete() # remove the duplicate
                 else:
-                    # requested id doesnt exist
-                    card.operation = CardOperation.NOP
-                    self[card._id] = card
+                    try:
+                        data = card.to_dict(drop_none=True)
+                        self[card._id].update(**data) # will raise a key error if card_id is not present in the database
+                    except KeyError:
+                        # requested id doesnt exist
+                        card.operation = CardOperation.NOP
+                        self[card._id] = card
             else:
                 # a request to update a card, the card could be an existing one or not
                 if dup:
@@ -226,9 +223,7 @@ class CollectionModel():
                     self[dup._id].update(**data)
                 else:
                     # card doesnt exist, create it
+                    card.amount = int(card.amount) if int(card.amount) > 0 else 1
                     card.generate_id()
-                    card.amount = int(card.amount)
-                    card.operation = CardOperation.CREATE
                     self[card._id] = card
-        
         return self

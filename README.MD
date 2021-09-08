@@ -24,9 +24,10 @@ Feel free to contact me for any question.
     * `/collections`
         * `GET`: Retrieve cards from active user's collection.
         * `PUT`, `POST`: Insert/update cards in active user's collection.
-        * `DELETE`: Clear active user's collection.
+        * `DELETE`: Delete cards from active user's collection.
     * `/collections/all`
         * `GET`: Retrieve **all** cards from active user's collection.
+        * `DELETE`: Clear active user's collection.
     * `/collections/<:card_id>`
         * `GET`: Retrieve a specific card from active user's collection.
         * `POST`: Update a specific card in active user's collection.
@@ -50,7 +51,7 @@ Response:
 {
     "msg": "user created",
     "username": {:string},
-    "access-token": {:string}
+    "access-token": f'Bearer {:string}'
 }
 ```
 
@@ -72,7 +73,7 @@ Response:
 {
     "msg": "successfuly logged in",
     "username": {:string},
-    "access-token": {:string}
+    "access-token": f'Bearer {:string}'
 }
 ```
 
@@ -119,7 +120,7 @@ Response:
 {
     "page": {:int},
     "per_page": {:int},
-    "total": {:int}, /* only present in the first page */
+    "total_documents": {:int}, /* only present in the first page */
     "next_page": {:stringUrl}, /* not present in the last page */
     "data": [
         {
@@ -159,7 +160,7 @@ GET /collections/all HTTP/1.1
 
 Response:
 {
-    "total": {:int},
+    "total_documents": {:int},
     "data": [
         {
             "_id": {:string},
@@ -191,7 +192,7 @@ Response:
 Clears the *active* user's collection.
 
 ```
-DELETE /collections HTTP/1.1
+DELETE /collections/all HTTP/1.1
 
 Response:
 [
@@ -209,13 +210,37 @@ Response:
 |----------|------------|------------|-------------|
 | Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
 
+### Delete Cards ###
+
+Deletes cards from *active* user's collection.
+
+```
+DELETE /collections HTTP/1.1
+
+Response:
+[
+    {
+        "_id": {:string},
+        "action": "DELETED",
+    },
+    {...},
+]
+```
+
+#### Parameters ####
+
+| Name     | Location   | Type       | Description |
+|----------|------------|------------|-------------|
+| Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+| cards | JSON Body | `List[Card]` | List of cards to be deleted from the collection. Only `Card.card_id` is actually used for the deletion operation. |
+
 ### Add or Update Collection ###
 
 Adds or updates cards in the *active* user's collection.
 
 ```
 POST /collections HTTP/1.1
-PUT /collections HTTP/1.1
+PUT  /collections HTTP/1.1
 
 Response:
 [
@@ -311,5 +336,5 @@ Mostly used for an easier starting point when `magicdex-desktop` is installed on
 ```
 GET /cards/phash HTTP/1.1
 
-303 Redirect: "https://github.com/LooLzzz/magicdex-server/raw/phash/border_crop.pickle"
+308 Redirect: "https://github.com/LooLzzz/magicdex-server/raw/phash/border_crop.pickle"
 ```

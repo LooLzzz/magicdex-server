@@ -3,7 +3,7 @@ from typing import Union
 from bson import json_util
 from bson.objectid import ObjectId
 
-from .. import collections_db
+from .. import cards_db
 from ..utils import CardCondition, CardOperation, to_bool
 
 
@@ -11,7 +11,7 @@ class CardModel():
     CardCondition = CardCondition
     CardOperation = CardOperation
 
-    def __init__(self, parent=None, scryfall_id:str=None, _id:Union[str, ObjectId]=None, amount:Union[int, str]='+1', tag:Union[str, dict]=None, foil:bool=None,
+    def __init__(self, parent=None, scryfall_id:str=None, _id:Union[str, ObjectId]=None, user_id:Union[str, ObjectId]=None, amount:Union[int, str]='+1', tag:Union[str, dict]=None, foil:bool=None,
                        condition:Union[CardCondition, int, str]=None, signed:bool=None, altered:bool=None, misprint:bool=None,
                        operation:Union[CardOperation, int, str]=CardOperation.UPDATE, fetch_data_by_id=False):
         data = None
@@ -20,11 +20,14 @@ class CardModel():
         if fetch_data_by_id:
             if not _id:
                 raise ValueError('Either _id or must be provided when using `fetch_data_by_id=True`')
-            data = self.get_card_data_by_id(parent.user_id, _id)
+            data = self.get_card_data_by_id(_id)
         if isinstance(amount, str):
             amount = amount.replace(' ','')
+        if user_id is None:
+            user_id = parent.user_id
 
         self.parent = parent
+        self.user_id = ObjectId(user_id) if user_id else user_id
         self._id = ObjectId(_id) if _id else _id
         self.scryfall_id = data['scryfall_id'] if data else scryfall_id
         self.amount = data['amount'] if data else amount
@@ -37,24 +40,14 @@ class CardModel():
         self.operation = CardOperation.parse(operation)
 
     @classmethod
-    def get_card_data_by_id(cls, user_id:Union[ObjectId, str], card_id:Union[ObjectId, str]):
-        data = collections_db.find_one(
-            {
-                'user_id': ObjectId(user_id)
-            },
-            {
-                'cards': {
-                    '$elemMatch': {
-                        '_id': ObjectId(card_id)
-                    }
-                }
-            }
+    def get_card_data_by_id(cls, card_id:Union[ObjectId, str]):
+        data = cards_db.find_one(
+            { '_id': ObjectId(card_id) }
         )
-        if data and 'cards' in data and len(data['cards']) > 0: # all the validations!
-            return data['cards'][0]
-        else:
-            raise KeyError(f'No card with id `{card_id}` found')
-        # return cls(**data['cards'])
+        if data:
+            return data
+        # else:
+        raise KeyError(f'No card with id `{card_id}` found')
 
     def find_duplicate(self):
         '''
@@ -64,20 +57,11 @@ class CardModel():
         :return: `CardModel` if duplicate is found, otherwise returns None.
         '''
         data = self.to_JSON(to_mongo=True, drop_cols=['_id', 'amount'])
-        res = collections_db.find_one(
-            {
-                'user_id': self.parent.user_id, # user_id
-            },
-            {
-                'cards': {
-                    '$elemMatch': {
-                        **data
-                    }
-                }
-            }
+        res = cards_db.find_one(
+            { **data }
         )
-        if res and 'cards' in res and len(res['cards']) > 0: # all the validations!
-            return CardModel(self.parent, **res['cards'][0])
+        if res:
+            return CardModel(self.parent, **res)
         return None
 
     def __getitem__(self, key):
@@ -100,9 +84,8 @@ class CardModel():
         if self._id == other._id:
             return True
         
-        del_keys = ['_id', 'amount', 'operation']
-        card = self.to_JSON(drop_cols=del_keys)
-        other = other.to_JSON(drop_cols=del_keys)
+        card = self.to_JSON(drop_cols=['_id', 'amount', 'operation'])
+        other = other.to_JSON(drop_cols=['_id', 'amount', 'operation'])
         
         return card == other
 
@@ -123,7 +106,7 @@ class CardModel():
         '''
         res = {
             '_id': self._id if to_mongo else str(self._id),
-            # '_id': self._id if to_mongo else {'$oid': str(self._id)},
+            'user_id': self.user_id if to_mongo else str(self.user_id),
             'scryfall_id': self.scryfall_id,
             'amount': self.amount if self.amount else 1,
             'tag': self.tag if self.tag else [],
@@ -145,6 +128,7 @@ class CardModel():
         '''
         res = {
             '_id': self._id,
+            'user_id': self.user_id,
             'scryfall_id': self.scryfall_id,
             'amount': self.amount,
             'tag': self.tag,
@@ -219,19 +203,9 @@ class CardModel():
         Creates a new `CardModel` instance in the database.
         Internal method, should not be called directly.
         '''
-        return collections_db.update_one(
-            {
-                # '_id': self.parent._id, # collection_id
-                'user_id': self.parent.user_id, # user_id
-            },
-            {
-                '$push': {
-                    'cards': self.to_JSON(to_mongo=True)
-                },
-                '$inc': {
-                    'cards_count': 1
-                }
-            }
+        self.parent.inc_doc_count(1)
+        return cards_db.insert_one(
+            { **self.to_JSON(to_mongo=True) }
         )
     
     def _delete(self):
@@ -239,21 +213,9 @@ class CardModel():
         Deletes this `CardModel` instance from the database.
         Internal method, should not be called directly.
         '''
-        return collections_db.update_one(
-            {
-                # '_id': self.parent._id, # collection_id
-                'user_id': self.parent.user_id, # user_id
-            },
-            {
-                '$pull': {
-                    'cards': {
-                        '_id': self._id # card_id
-                    }
-                },
-                '$inc': {
-                    'cards_count': -1
-                }
-            }
+        self.parent.inc_doc_count(-1)
+        return cards_db.delete_one(
+            { '_id': self._id } # card_id
         )
     
     def _update(self):
@@ -261,15 +223,11 @@ class CardModel():
         Updates this `CardModel` instance in the database.
         Internal method, should not be called directly.
         '''
-        return collections_db.update_one(
-            {
-                # '_id': self.parent._id, # collection_id
-                'user_id': self.parent.user_id, # user_id
-                'cards._id': self._id # card_id
-            },
+        return cards_db.update_one(
+            { '_id': self._id }, # card_id
             {
                 '$set': {
-                    'cards.$': self.to_JSON(to_mongo=True)
+                    **self.to_JSON(to_mongo=True)
                 }
             }
         )

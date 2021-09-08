@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Union, List
 from bson import ObjectId
 from flask_jwt_extended import create_access_token
+from pymongo import ReturnDocument
 
 from ..utils import UserDoesNotExist, UserAlreadyExists
 from .. import bcrypt, users_db
@@ -39,7 +40,7 @@ class UserModel():
         
         user = self.exists(user_id, username)
         if not user:
-            self.user_id = username
+            self.user_id = user_id
             self.username = username
             self.exists = False
         else:
@@ -51,6 +52,35 @@ class UserModel():
     def __bool__(self):
         return bool(self.exists)
     
+    def doc_count(self):
+        '''
+        Retrieves the number of document cards in the collection from the database.
+        
+        :return: Number of document cards in the collection
+        '''
+        data = users_db.find_one(
+            { '_id': ObjectId(self.user_id) } # filter
+        )
+        return data['doc_count']
+
+    def inc_doc_count(self, amount:int):
+        '''
+        Increments the number of document cards in the collection by `amount`.
+
+        :param amount: The amount to increment
+        :return: The new document count
+        '''
+        res = users_db.find_one_and_update(
+            filter = { '_id': self.user_id },
+            update = {
+                '$inc': {
+                    'doc_count': amount
+                }
+            },
+            return_document = ReturnDocument.AFTER
+        )
+        return res['doc_count']
+
     @exist_required()
     def check_password_hash(self, password):
         '''
@@ -58,7 +88,7 @@ class UserModel():
 
         :param pw_hash: The hash to be compared against
         :param password: The password to compare
-        :raises `ValueError`: If the user does not exist
+        :raises `UserDoesNotExist(ValueError)`: If the user does not exist
         :return: An access token for the user
         '''
         return bcrypt.check_password_hash(self.password_hash, password)
@@ -66,12 +96,15 @@ class UserModel():
     @exist_required()
     def create_access_token(self):
         '''
-        Creates an access token for the user.
+        Creates an access token for the user in the form of `f'Bearer {access-token}'`
 
-        :raises `ValueError`: If the user does not exist
+        :raises `UserDoesNotExist(ValueError)`: If the user does not exist
         :return: An access token for the user
         '''
-        return create_access_token(identity=( str(self.user_id), self.username ))
+        access_token = create_access_token(
+            identity = ( str(self.user_id), self.username )
+        )
+        return f'Bearer {access_token}'
 
     @classmethod
     def exists(cls, user_id:Union[ObjectId, str]=None, username:str=None):
@@ -97,17 +130,15 @@ class UserModel():
         
         :param username: The user's username
         :param password: The user's password
-        :raises `ValueError`: If the username is already taken
+        :raises `UserAlreadyExists(ValueError)`: If the username is already taken
         :return: A new `UserModel` instance of the newly created user
         '''
-        
-        # TODO: make it into a transaction (if able)
-
         user_id = users_db.insert_one({
             'username': self.username,
             'password': bcrypt.generate_password_hash(password).decode('utf-8'),
-            'date': datetime.now()
+            'date': datetime.now(),
+            'doc_count': 0
         }).inserted_id
         
-        CollectionModel.create(user_id)
+        # CollectionModel.create(user_id)
         return UserModel(user_id=str(user_id))

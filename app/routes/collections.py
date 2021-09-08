@@ -63,31 +63,58 @@ def data_validator(parser):
 
 
 class CollectionsApi():
-
-    @classmethod
-    @jwt_required()
-    def load_all(cls):
+    '''
+    A container for the collections api.
+    Contains three APIs accesible by inner classes:
+        - `CollectionsApi.Collections`
+        - `CollectionsApi.All`
+        - `CollectionsApi.Cards`
+    '''
+    class All(Resource):
         '''
-        Loads all cards from the database.
+        ## `/collections/all` ENDPOINT
+
+        ### GET
+        Loads *all* cards associated with a given user from the database.
         
-        :return: JSON object
+        ### DELETE
+        Clears all cards associated with a given user from the database.
         '''
-        user_id, username = get_jwt_identity()
-        user = UserModel(user_id)
+        @jwt_required()
+        def get(cls):
+            user_id, username = get_jwt_identity()
+            user = UserModel(user_id)
 
-        data = user.collection \
-                .load_all() \
-                .to_JSON()
-        return {
-            'total': data['cards_count'],
-            'data': data['cards']
-        }
+            data = user.collection \
+                    .load_all() \
+                    .to_JSON(cards_drop_cols=['user_id'])
+            return {
+                'total_documents': data['doc_count'],
+                'data': data['cards']
+            }
+        
+        @jwt_required()
+        def delete(cls):
+            user_id, username = get_jwt_identity()
+            user = UserModel(user_id)
+
+            return user.collection \
+                    .clear() \
+                    .save()
 
     class Collections(Resource):
         '''
-        * get - get collection
-        * delete - clear collection
-        * put/post - update collection
+        ## `/collections` ENDPOINT
+
+        ### GET
+        Loads cards associated with a given user from the database.  
+        Supports pagination.
+
+        ### DELETE
+        Deletes selected `card_id`s associated with a given user from the database.
+
+        ### POST / PUT
+        Updates/Inserts cards from given user's collections in the database.
         '''
 
         @jwt_required()
@@ -99,16 +126,16 @@ class CollectionsApi():
 
             data = user.collection \
                     .load(**kwargs) \
-                    .to_JSON()
+                    .to_JSON(cards_drop_cols=['user_id'])
             res = {
                 **kwargs,
                 'data': data['cards']
             }
 
             if page == 1:
-                # show total card count on the first page
-                res['total'] = data['cards_count']
-            if page * per_page < data['cards_count']:
+                # show total document count on the first page
+                res['total_documents'] = data['doc_count']
+            if page * per_page < data['doc_count']:
                 # show url for the next page if there are cards left to show
                 kwargs['page'] += 1
                 args = '&'.join([ f'{k}={repr(v)}' for k,v in kwargs.items() ])
@@ -117,13 +144,9 @@ class CollectionsApi():
             return res
 
         @jwt_required()
-        def delete(self):
-            user_id, username = get_jwt_identity()
-            user = UserModel(user_id)
-            
-            return user.collection \
-                    .clear() \
-                    .save()
+        @data_validator(collection_parser)
+        def delete(self, user:UserModel, cards:List[CardModel]):
+            return [ card.delete().save() for card in cards ]
 
         @jwt_required()
         @data_validator(collection_parser)
@@ -141,6 +164,18 @@ class CollectionsApi():
 
 
     class Cards(Resource):
+        '''
+        ## `/collections` ENDPOINT
+
+        ### GET
+        Loads a specific card using it's `card_id` from the database.
+
+        ### DELETE
+        Deletes a specific card using it's `card_id` from the database.
+
+        ### POST
+        Updates a specific card using it's `card_id` from the database.
+        '''
         @jwt_required()
         def get(self, card_id:str):
             user_id, username = get_jwt_identity()
@@ -148,7 +183,7 @@ class CollectionsApi():
 
             return user \
                     .collection[card_id] \
-                    .to_JSON()
+                    .to_JSON(drop_cols=['user_id'])
 
         @jwt_required()
         @data_validator(card_parser)
