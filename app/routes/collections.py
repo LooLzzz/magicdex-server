@@ -7,15 +7,16 @@ from flask_restful.reqparse import RequestParser
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 # from .. import users_db, collections_db
-from ..utils import get_arg_dict, get_arg_list, to_json, to_bool, to_amount, CardCondition
+from ..utils import get_arg_dict, get_arg_list, to_json, to_bool, to_amount, to_card_list
+from ..utils import CardCondition, DatabaseOperation
 from ..models import UserModel, CardModel
 
 collection_parser = RequestParser(bundle_errors=True)
-collection_parser.add_argument('cards', location=['form', 'args', 'json'], case_sensitive=False, type=to_json)
+collection_parser.add_argument('cards', location=['form', 'args', 'json'], case_sensitive=False, default=[], type=to_card_list)
 
 get_all_parser = RequestParser(bundle_errors=True)
-get_all_parser.add_argument('page',     location=['form', 'args', 'json'], case_sensitive=False, default=1,     type=int)
-get_all_parser.add_argument('per_page', location=['form', 'args', 'json'], case_sensitive=False, default=20,    type=int)
+get_all_parser.add_argument('page',     location=['form', 'args', 'json'], case_sensitive=False, default=1,  type=int)
+get_all_parser.add_argument('per_page', location=['form', 'args', 'json'], case_sensitive=False, default=20, type=int)
 # get_all_parser.add_argument('all',      location=['form', 'args', 'json'], case_sensitive=False, default=False, type=to_bool)
 
 
@@ -44,13 +45,21 @@ def data_validator(parser):
                         jsonify({ 'msg': 'no data provided' }),
                         400
                     ))
-                if 'cards' in kwargs:
+                if 'cards' in kwargs and kwargs['cards']:
                     kwargs['cards'] = [ CardModel(parent=user.collection, **item) for item in kwargs['cards'] ]
+            except ValueError as e:
+                abort(make_response(
+                    jsonify({
+                        'msg': 'bad card request',
+                        'errors': e.args
+                    }),
+                    400
+                ))
             except (InvalidId, KeyError) as e:
                 abort(make_response(
                     jsonify({
                         'msg': 'card not found',
-                        'errors':e.args 
+                        'errors': e.args
                     }),
                     404
                 ))
@@ -148,20 +157,26 @@ class CollectionsApi():
         def delete(self, user:UserModel, cards:List[CardModel]):
             return [ card.delete().save() for card in cards ]
 
-        @jwt_required()
-        @data_validator(collection_parser)
-        def put(self, user:UserModel, cards:List[CardModel]):
-            return user.collection \
-                    .update(cards) \
-                    .save()
+        # @jwt_required()
+        # @data_validator(collection_parser)
+        # def put(self, user:UserModel, cards:List[CardModel]):
+        #     return user.collection \
+        #             .update(cards) \
+        #             .save()
 
         @jwt_required()
         @data_validator(collection_parser)
         def post(self, user:UserModel, cards:List[CardModel]):
-            return user.collection \
+            res = user.collection \
                     .update(cards) \
                     .save()
-
+            
+            # only return fields that were updated
+            for card, res_item in zip(cards, res):
+                if card.operation == DatabaseOperation.UPDATE:
+                    fields = list(card.to_dict(drop_cols=['user_id', 'operation'], drop_none=True).keys())
+                    res_item['card'] = { k:v for k,v in res_item['card'].items() if k in fields }
+            return res
 
     class Cards(Resource):
         '''
@@ -192,8 +207,8 @@ class CollectionsApi():
                     .update(**kwargs) \
                     .save()
 
-            cols = ['_id'] + list(kwargs.keys())
-            return { k:v for k,v in user.collection[card_id].to_JSON().items() if k in cols }
+            fields = ['_id'] + list(kwargs.keys())
+            return { k:v for k,v in user.collection[card_id].to_JSON().items() if k in fields }
         
         @jwt_required()
         def delete(self, card_id:str):

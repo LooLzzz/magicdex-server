@@ -8,7 +8,7 @@ class _BaseEnum(Enum):
         return self.name
 
 
-class CardOperation(_BaseEnum):
+class DatabaseOperation(_BaseEnum):
     '''
     enum{ CREATE=0, UPDATE, DELETE, NOP }
     '''
@@ -29,19 +29,22 @@ class CardOperation(_BaseEnum):
             try:
                 return cls(int(value))
             except ValueError:
-                return cls[value.upper()]
-        raise EnumParsingError(f'Unable to parse value to Operation Enum: {value}')
+                try:
+                    return cls[value.upper()]
+                except KeyError:
+                    pass
+        raise EnumParsingError(f'Unable to parse value to Operation Enum: `{value}`')
 
     def to_past_tense(self):
-        if self == CardOperation.CREATE:
+        if self == DatabaseOperation.CREATE:
             return 'CREATED'
-        if self == CardOperation.UPDATE:
+        if self == DatabaseOperation.UPDATE:
             return 'UPDATED'
-        if self == CardOperation.DELETE:
+        if self == DatabaseOperation.DELETE:
             return 'DELETED'
-        if self == CardOperation.NOP:
+        if self == DatabaseOperation.NOP:
             return 'NOP'
-        raise ValueError(f'Unable to get past tense for Operation Enum: {self}')
+        raise ValueError(f'Unable to get past tense for Operation Enum: `{self}`')
 
 
 class CardCondition(_BaseEnum):
@@ -66,11 +69,14 @@ class CardCondition(_BaseEnum):
             try:
                 return cls(int(value))
             except ValueError:
-                value = value \
-                        .replace(' ', '_') \
-                        .replace('-', '_') \
-                        .upper()
-                if '_' in value:
-                    value = ''.join([ word[0] for word in value.split('_') ]) # `NEAR_MINT` -> `NM`
-                return cls[value]
-        raise EnumParsingError(f'Unable to parse value to Condition Enum: {value}')
+                try:
+                    value = value \
+                            .replace(' ', '_') \
+                            .replace('-', '_') \
+                            .upper()
+                    if '_' in value:
+                        value = ''.join([ word[0] for word in value.split('_') ]) # `NEAR_MINT` -> `NM`
+                    return cls[value]
+                except KeyError:
+                    pass
+        raise EnumParsingError(f'Unable to parse value to Condition Enum: `{value}`')

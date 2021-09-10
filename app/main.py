@@ -5,6 +5,12 @@ from . import app, api
 from .routes import AuthUsersApi, JwtApi, CollectionsApi, SellersApi
 
 
+@app.after_request
+def add_header(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Credentials'] = True
+    return response
+
 @app.route('/', defaults={'path': ''})
 @app.route('/<string:path>')
 def index(path):

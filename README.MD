@@ -23,14 +23,14 @@ Feel free to contact me for any question.
 * [Collections](#collections)
     * `/collections`
         * `GET`: Retrieve cards from active user's collection.
-        * `PUT`, `POST`: Insert/update cards in active user's collection.
+        * `POST`: Insert or update cards from active user's collection.
         * `DELETE`: Delete cards from active user's collection.
     * `/collections/all`
         * `GET`: Retrieve **all** cards from active user's collection.
         * `DELETE`: Clear active user's collection.
     * `/collections/<:card_id>`
         * `GET`: Retrieve a specific card from active user's collection.
-        * `POST`: Update a specific card in active user's collection.
+        * `POST`: Update a specific card from active user's collection.
         * `DELETE`: Delete a specific card from active user's collection.
 * [Cards](#cards)
     * `/cards/phash`
@@ -110,7 +110,7 @@ Response:
 
 ### Get Cards ###
 
-Retrieves a list of cards in the *active* user's collection.  
+Retrieves a list of cards from the *active* user's collection.  
 Supports pagination.
 
 ```
@@ -152,7 +152,7 @@ Response:
 
 ### Get All Cards ###
 
-Retrieves all cards in the *active* user's collection.  
+Retrieves all cards from the *active* user's collection.  
 Does not use pagination.
 
 ```
@@ -236,11 +236,10 @@ Response:
 
 ### Add or Update Collection ###
 
-Adds or updates cards in the *active* user's collection.
+Inserts or updates cards from the *active* user's collection.
 
 ```
 POST /collections HTTP/1.1
-PUT  /collections HTTP/1.1
 
 Response:
 [

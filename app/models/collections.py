@@ -1,31 +1,19 @@
 import json, os
-from flask import abort, jsonify, make_response, request
-from urllib.parse import urlparse
+from flask import abort, jsonify, make_response
 from typing import Iterable, Union, List, Dict
 from bson import ObjectId, json_util
 
-from ..utils import CardOperation
+from ..utils import DatabaseOperation
 from .. import cards_db
 from . import CardModel
 
 
 class CollectionModel():
     def __init__(self, parent):
-        # data = collections_db.find_one(
-        #     { 'user_id': ObjectId(parent.user_id) }, # filter
-        #     {
-        #         # projection
-        #         '_id': 1,
-        #         'user_id': 1,
-        #     }
-        # )
-        # if not data:
-        #     raise ValueError('Collection does not exist')
-
         self.parent = parent
         self.user_id = self.parent.user_id
         # self._id = data['_id']
-        self.cards:Dict[ObjectId, CardModel] = {}
+        self._cards:Dict[ObjectId, CardModel] = {}
         # self.cards = { card._id: card for card in [CardModel(parent=self, **item) for item in data['cards']] }
         self.clear_db = False
 
@@ -38,34 +26,34 @@ class CollectionModel():
             raise ValueError(f'Invalid key type {type(key)}')
 
         for k in keys:
-            if k not in self.cards:
-                self.cards[k] = CardModel(self, _id=k, fetch_data_by_id=True)
-        res = { k:v for k,v in self.cards.items() if k in keys }
+            if k not in self._cards:
+                self._cards[k] = CardModel(self, _id=k, fetch_data_by_id=True)
+        res = { k:v for k,v in self._cards.items() if k in keys }
         return res if isinstance(key, (list, tuple)) else list(res.values())[0]
 
     def __setitem__(self, key, value):
-        self.cards[ObjectId(key)] = value
+        self._cards[ObjectId(key)] = value
 
     def __delitem__(self, key):
-        del self.cards[ObjectId(key)]
+        del self._cards[ObjectId(key)]
 
     def __contains__(self, key):
-        return ObjectId(key) in self.cards
+        return ObjectId(key) in self._cards
 
     def __iter__(self):
-        return iter(self.cards)
+        return iter(self._cards)
     
     def values(self):
-        return self.cards.values()
+        return self._cards.values()
     
     def items(self):
-        return self.cards.items()
+        return self._cards.items()
     
     def keys(self):
-        return self.cards.keys()
+        return self._cards.keys()
 
     def __repr__(self):
-        return repr(self.cards)
+        return repr(self._cards)
 
     def inc_doc_count(self, amount:int):
         '''
@@ -85,7 +73,7 @@ class CollectionModel():
             # '_id': self._id if to_mongo else {'$oid': str(self._id)},
             'user_id': self.user_id if to_mongo else str(self.user_id),
             'doc_count': self.parent.doc_count(),
-            'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self.cards.values() ],
+            'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self._cards.values() ],
         }
         return { k:v for k,v in res.items() if k not in drop_cols }
 
@@ -103,8 +91,6 @@ class CollectionModel():
             abort(make_response(
                 jsonify({
                     'msg': 'pagination page out of bounds',
-                    # 'back_to_start': f'http://{urlparse(request.base_url).hostname}/collections?page=1',
-                    # 'back_to_start': request.host_url + 'collections?page=1',
                     'first_page': f'{os.environ["APP_URL"]}/collections?page=1&per_page={per_page}',
                     'data': []
                 }),
@@ -115,7 +101,7 @@ class CollectionModel():
                 .find({ 'user_id': ObjectId(self.user_id) }) \
                 .skip(skip_amount) \
                 .limit(per_page)
-            self.cards = { item['_id']: CardModel(self, **item) for item in data }
+            self._cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
     
     def load_all(self):
@@ -127,7 +113,7 @@ class CollectionModel():
         data = cards_db.find(
             { 'user_id': ObjectId(self.user_id) }
         )
-        self.cards = { item['_id']: CardModel(self, **item) for item in data }
+        self._cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
 
     @classmethod
@@ -169,7 +155,7 @@ class CollectionModel():
                     'action': 'DELETED'
                 }]
         else:
-            for card in self.cards.values():
+            for card in self._cards.values():
                 res += [ card.save() ]
         
         return res
@@ -213,7 +199,7 @@ class CollectionModel():
                         self[card._id].update(**data) # will raise a key error if card_id is not present in the database
                     except KeyError:
                         # requested id doesnt exist
-                        card.operation = CardOperation.NOP
+                        card.operation = DatabaseOperation.NOP
                         self[card._id] = card
             else:
                 # a request to update a card, the card could be an existing one or not
@@ -223,7 +209,6 @@ class CollectionModel():
                     self[dup._id].update(**data)
                 else:
                     # card doesnt exist, create it
-                    card.amount = int(card.amount) if int(card.amount) > 0 else 1
-                    card.generate_id()
-                    self[card._id] = card
+                    card = card.none_values_to_default().generate_id()
+                    self._cards[card._id] = card
         return self

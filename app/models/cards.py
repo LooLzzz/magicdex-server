@@ -1,25 +1,37 @@
 import json
 from typing import Union
-from bson import json_util
+from flask import abort, jsonify, make_response
 from bson.objectid import ObjectId
 
 from .. import cards_db
-from ..utils import CardCondition, CardOperation, to_bool
+from ..utils import CardCondition, DatabaseOperation, to_bool
 
 
 class CardModel():
-    CardCondition = CardCondition
-    CardOperation = CardOperation
+    CardCondition     = CardCondition
+    DatabaseOperation = DatabaseOperation
 
-    def __init__(self, parent=None, scryfall_id:str=None, _id:Union[str, ObjectId]=None, user_id:Union[str, ObjectId]=None, amount:Union[int, str]='+1', tag:Union[str, dict]=None, foil:bool=None,
+    def __init__(self, parent=None, scryfall_id:str=None, _id:Union[str, ObjectId]=None, user_id:Union[str, ObjectId]=None, amount:Union[int, str]=None, tag:Union[str, dict]=None, foil:bool=None,
                        condition:Union[CardCondition, int, str]=None, signed:bool=None, altered:bool=None, misprint:bool=None,
-                       operation:Union[CardOperation, int, str]=CardOperation.UPDATE, fetch_data_by_id=False):
+                       operation:Union[DatabaseOperation, int, str]=DatabaseOperation.UPDATE, fetch_data_by_id=False):
+        '''
+        :raises ValueError: when neither `scryfall_id` nor `_id` is provided
+        :raises KeyError: when `fetch_data_by_id=True` and `_id` is not found in the database
+        :raises EnumParsingError(ValueError): when `condition` or `operation` cant be parsed to its enum counterpart
+        :raises bson.errors.InvalidId: when `_id` is not a valid ObjectId
+        '''
         data = None
-        # if not (_id or scryfall_id):
-        #     raise ValueError('Either _id or scryfall_id must be provided')
+        if not (_id or scryfall_id):
+                raise ValueError('Either `_id` or `scryfall_id` must be provided')
+            # abort(make_response(
+            #     jsonify({
+            #         'msg': 'Either `_id` or `scryfall_id` must be provided',
+            #     }),
+            #     400
+            # ))
         if fetch_data_by_id:
             if not _id:
-                raise ValueError('Either _id or must be provided when using `fetch_data_by_id=True`')
+                raise ValueError('`_id` must be provided when using `fetch_data_by_id=True`')
             data = self.get_card_data_by_id(_id)
         if isinstance(amount, str):
             amount = amount.replace(' ','')
@@ -37,7 +49,7 @@ class CardModel():
         self.signed = data['signed'] if data else signed
         self.altered = data['altered'] if data else altered
         self.misprint = data['misprint'] if data else misprint
-        self.operation = CardOperation.parse(operation)
+        self.operation = DatabaseOperation.parse(operation)
 
     @classmethod
     def get_card_data_by_id(cls, card_id:Union[ObjectId, str]):
@@ -51,7 +63,7 @@ class CardModel():
 
     def find_duplicate(self):
         '''
-        Looks for a duplication of `self`, excluding `{self._id, self.amount}` while searching.
+        Looks for a duplication of `self` in the database, excluding `{self._id, self.amount}` while searching.
         Default values are used if `None` is found.
         
         :return: `CardModel` if duplicate is found, otherwise returns None.
@@ -97,7 +109,7 @@ class CardModel():
         :return: A updated `CardModel` instance
         '''
         self._id = ObjectId()
-        self.operation = CardOperation.CREATE
+        self.operation = DatabaseOperation.CREATE
         return self
 
     def to_JSON(self, to_mongo=False, drop_cols=[]):
@@ -152,7 +164,7 @@ class CardModel():
         
         :return: An updated `CardModel` instance
         '''
-        self.amount = int(self.amount) if self.amount else 1
+        self.amount = int(self.amount) if self.amount and int(self.amount) > 0 else 1
         self.tag = self.tag if self.tag else []
         self.foil = self.foil if self.foil else False
         self.condition = self.condition if self.condition else CardCondition['NM']
@@ -163,7 +175,7 @@ class CardModel():
 
     def update(self, **kwargs):
         '''
-        Updates this `CardModel` instance with the values from another `CardModel` instance.
+        Updates this `CardModel` instance with the given keyword arguments.
         If `amount > 0` self.operation will be set to `UPDATE`, otherwise it will be set to `DELETE`
 
         :param kwargs: Any `CardModel` properties to update
@@ -176,14 +188,14 @@ class CardModel():
             else:
                 self.amount = int(amount)
         if self.amount > 0:
-            self.operation = CardOperation.UPDATE
+            self.operation = DatabaseOperation.UPDATE
         else:
-            self.operation = CardOperation.DELETE
+            self.operation = DatabaseOperation.DELETE
 
         self.scryfall_id = kwargs['scryfall_id'] if 'scryfall_id' in kwargs else self.scryfall_id
         self.tag = kwargs['tag'] if 'tag' in kwargs else self.tag
         self.foil = to_bool(kwargs['foil']) if 'foil' in kwargs else self.foil
-        self.condition = str(CardCondition.parse(kwargs['condition'])) if 'condition' in kwargs else self.condition
+        self.condition = CardCondition.parse(kwargs['condition']) if 'condition' in kwargs else self.condition
         self.signed = to_bool(kwargs['signed']) if 'signed' in kwargs else self.signed
         self.altered = to_bool(kwargs['altered']) if 'altered' in kwargs else self.altered
         self.misprint = to_bool(kwargs['misprint']) if 'misprint' in kwargs else self.misprint
@@ -195,23 +207,31 @@ class CardModel():
         Marks this `CardModel` instance to be deleted from the collection.
         Does not update the database.
         '''
-        self.operation = CardOperation.DELETE
+        self.operation = DatabaseOperation.DELETE
         return self
 
     def _create(self):
         '''
         Creates a new `CardModel` instance in the database.
-        Internal method, should not be called directly.
+        Internal method, should not be called directly, use `CardModel.save()` instead.
         '''
-        self.parent.inc_doc_count(1)
-        return cards_db.insert_one(
-            { **self.to_JSON(to_mongo=True) }
+        old_id = self._id
+        
+        res = cards_db.insert_one(
+            { **self.to_JSON(to_mongo=True, drop_cols=['_id']) }
         )
+        self.parent.inc_doc_count(1)
+        self._id = res.inserted_id
+        
+        del self.parent[old_id]
+        self.parent[self._id] = self
+        
+        return res
     
     def _delete(self):
         '''
         Deletes this `CardModel` instance from the database.
-        Internal method, should not be called directly.
+        Internal method, should not be called directly, use `CardModel.save()` instead.
         '''
         self.parent.inc_doc_count(-1)
         return cards_db.delete_one(
@@ -221,7 +241,7 @@ class CardModel():
     def _update(self):
         '''
         Updates this `CardModel` instance in the database.
-        Internal method, should not be called directly.
+        Internal method, should not be called directly, use `CardModel.save()` instead.
         '''
         return cards_db.update_one(
             { '_id': self._id }, # card_id
@@ -244,15 +264,19 @@ class CardModel():
             '_id': str(self._id),
             'action': self.operation.to_past_tense()
         }
-        if self.operation == CardOperation.NOP:
+        
+        if self.operation == DatabaseOperation.NOP:
             res['msg'] = '`_id` not found in collection'
-            res['help'] = "when creating a new card, leave it's `_id` field empty"
-        elif self.operation == CardOperation.DELETE or self.amount <= 0:
+            res['extra_info'] = "when creating a new card, leave it's `_id` field empty"
+        elif self.operation == DatabaseOperation.DELETE or self.amount <= 0:
             self._delete()
-        elif self.operation == CardOperation.UPDATE:
+        elif self.operation == DatabaseOperation.UPDATE:
             self._update()
-        elif self.operation == CardOperation.CREATE:
+            res['card'] = self.to_JSON(drop_cols=['user_id'])
+        elif self.operation == DatabaseOperation.CREATE:
             self._create()
+            res['card'] = self.to_JSON(drop_cols=['user_id'])
         else:
             raise Exception('Invalid operation')
+                
         return res
