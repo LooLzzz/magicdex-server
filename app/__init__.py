@@ -2,6 +2,7 @@ import os, dotenv, certifi
 from datetime import timedelta
 from flask import Flask
 from flask_bcrypt import Bcrypt
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_pymongo import PyMongo
 from flask_restful import Api
@@ -30,10 +31,10 @@ mongo = PyMongo(app, tlsCAFile=certifi.where())
 bcrypt = Bcrypt(app)
 api = Api(app)
 jwt = JWTManager(app)
+cors = CORS(app)
 
 ## mongodb collections
 users_db = mongo.db['users']
-# collections_db = mongo.db['collections']
 cards_db = mongo.db['cards']
 
 

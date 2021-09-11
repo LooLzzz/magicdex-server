@@ -9,17 +9,17 @@ parser.add_argument('username', location=['form', 'args', 'json'], required=True
 parser.add_argument('password', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=True, type=str)
 
 
-class AuthUsersApi(Resource):
+class UsersEndpoint(Resource):
     '''
-    ## `/auth/jwt` ENDPOINT
+    ## `/auth[/users]` ENDPOINT
 
-    ### GET
+    ### POST/GET
     Login using a username and password combination.
     
     ### PUT
     Register a new user a username and password combination.
     '''
-    def get(self):
+    def post(self):
         kwargs = get_arg_dict(parser)
         user = UserModel(username=kwargs['username'])
 
@@ -37,6 +37,9 @@ class AuthUsersApi(Resource):
                 { 'msg': 'username and password combination not found' },
                 401
             )
+
+    def get(self):
+        return self.post()
        
     def put(self):
         kwargs = get_arg_dict(parser)

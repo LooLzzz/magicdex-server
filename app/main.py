@@ -1,39 +1,37 @@
-from flask import redirect
+# from flask import redirect
 # from flask_jwt_extended import jwt_required
 
 from . import app, api
-from .routes import AuthUsersApi, JwtApi, CollectionsApi, SellersApi
+from .routes import auth, cards, collections
 
-
-@app.after_request
-def add_header(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Credentials'] = True
-    return response
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<string:path>')
 def index(path):
+    '''
+    Catch-all route
+    '''
     return {'msg': 'this is not the api you are looking for'}, 418
 
 
-def start_auth_endpoint():
-    api.add_resource(AuthUsersApi, '/auth/users')
-    api.add_resource(JwtApi, '/auth/jwt')
+def init_auth_route():
+    api.add_resource(auth.UsersEndpoint, '/auth', endpoint='auth')
+    api.add_resource(auth.UsersEndpoint, '/auth/users')
+    api.add_resource(auth.JwtEndpoint,   '/auth/jwt')
 
 
-def start_cards_endpoint():
-    api.add_resource(SellersApi, '/cards/sellers')
-    app.add_url_rule('/cards/phash', methods=['GET'], endpoint='phash', view_func=lambda: redirect('https://github.com/LooLzzz/magicdex-server/raw/phash/border_crop.pickle', 308))
+def init_cards_route():
+    api.add_resource(cards.PhashEndpoint, '/cards/phash')
+    # api.add_resource(SellersEndpoint,     '/cards/sellers')
 
 
-def start_collections_endpoint():
-    api.add_resource(CollectionsApi.Collections, '/collections')
-    api.add_resource(CollectionsApi.Cards,       '/collections/<string:card_id>')
-    api.add_resource(CollectionsApi.All,         '/collections/all')
+def init_collections_route():
+    api.add_resource(collections.CollectionsEndpoint, '/collections')
+    api.add_resource(collections.CardEndpoint,        '/collections/<string:card_id>')
+    api.add_resource(collections.AllEndpoint,         '/collections/all')
 
 
 ## main ##
-start_auth_endpoint()
-start_cards_endpoint()
-start_collections_endpoint()
+init_auth_route()
+init_cards_route()
+init_collections_route()

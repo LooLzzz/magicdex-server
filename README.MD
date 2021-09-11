@@ -15,11 +15,11 @@ Feel free to contact me for any question.
 ## API Overview ##
 
 * [Authentication](#authentication)
-    * `/auth/users`
-        * `GET`: Login using a username and password combination.
+    * `/auth` or `/auth/users`
+        * `POST`/`GET`: Login using a username and password combination.
         * `PUT`: Register a new user.
     * `/auth/jwt`
-        * `GET`: Login using an access token.
+        * `POST`/`GET`: Login using an access token.
 * [Collections](#collections)
     * `/collections`
         * `GET`: Retrieve cards from active user's collection.
@@ -67,7 +67,8 @@ Response:
 Login using an existing username & password combination.
 
 ```
-GET /auth/users HTTP/1.1
+GET  /auth/users HTTP/1.1
+POST /auth/users HTTP/1.1
 
 Response:
 {
@@ -89,7 +90,8 @@ Response:
 Re-login using a saved JWT Token.
 
 ```
-GET /auth/jwt HTTP/1.1
+GET  /auth/jwt HTTP/1.1
+POST /auth/jwt HTTP/1.1
 
 Response:
 {
