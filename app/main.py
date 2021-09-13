@@ -17,7 +17,6 @@ def index(path):
 def init_auth_route():
     api.add_resource(auth.UsersEndpoint, '/auth', endpoint='auth')
     api.add_resource(auth.UsersEndpoint, '/auth/users')
-    api.add_resource(auth.JwtEndpoint,   '/auth/jwt')
 
 
 def init_cards_route():

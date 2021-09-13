@@ -96,7 +96,7 @@ class UserModel():
     @exist_required()
     def create_access_token(self):
         '''
-        Creates an access token for the user in the form of `f'Bearer {access-token}'`
+        Creates an access token for the user.
 
         :raises `UserDoesNotExist(ValueError)`: If the user does not exist
         :return: An access token for the user
@@ -104,7 +104,8 @@ class UserModel():
         access_token = create_access_token(
             identity = ( str(self.user_id), self.username )
         )
-        return f'Bearer {access_token}'
+        # return 'Bearer {access_token}'
+        return access_token
 
     @classmethod
     def exists(cls, user_id:Union[ObjectId, str]=None, username:str=None):

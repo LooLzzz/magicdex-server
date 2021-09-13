@@ -16,19 +16,21 @@ def get_arg_dict(parser):
 def dictkeys_to_lower(d:dict):
     return { k: v for k,v in d.items() }
 
-def to_json(value) -> Union[dict, List[dict]]:
-    if isinstance(value, (dict, list)):
+def to_taglist(value):
+    if isinstance(value, str):
+        value = json.loads(
+            value \
+                .replace("\\n", '') \
+                .replace("\n", '')  \
+                .replace("'", '"')  \
+                .replace('"{', '{') \
+                .replace('}"', '}') \
+                .replace('"[', '[') \
+                .replace(']"', ']')
+        )
+    if isinstance(value, list) and all( isinstance(value, str) for value in value ):
         return value
-    return json.loads(
-        value \
-            .replace("\\n", '') \
-            .replace("\n", '')  \
-            .replace("'", '"')  \
-            .replace('"{', '{') \
-            .replace('}"', '}') \
-            .replace('"[', '[') \
-            .replace(']"', ']')
-    )
+    raise ValueError(f'`tag` field should be an array of strings')
 
 def to_bool(s):
     _s = str(s).lower()
@@ -36,8 +38,7 @@ def to_bool(s):
         return True
     elif _s == 'false':
         return False
-    else:
-        raise BooleanParsingError(f'`{s}` cannot be parsed as boolean')
+    raise BooleanParsingError(f'`{s}` cannot be parsed as boolean')
 
 def to_amount(value):
     if re.match(r'^[+\-][1-9][0-9]*', value): # look for '+X' or '-X'
@@ -47,35 +48,40 @@ def to_amount(value):
     except ValueError:
         raise ValueError(f'`amount` field should be the in form of one of the following: {{X, +X, -X}} where X is an integer')
 
-def to_card_list(value) -> List[dict]:
-    cards = json.loads(
-        value \
-            .replace("\\n", '') \
-            .replace("\n", '')  \
-            .replace("'", '"')  \
-            .replace('"{', '{') \
-            .replace('}"', '}') \
-            .replace('"[', '[') \
-            .replace(']"', ']')
-    )
+card_kwargs = {
+    '_id':         str,
+    'scryfall_id': str,
+    'amount':      to_amount,
+    'tag':         to_taglist,
+    'foil':        to_bool,
+    'condition':   CardCondition.parse,
+    'signed':      to_bool,
+    'altered':     to_bool,
+    'misprint':    to_bool
+}
 
-    if not isinstance(cards, list):
-        raise ValueError(f'`cards` is not a list')
+def to_card(value) -> dict:
+    if isinstance(value, str):
+        card = json.loads(
+            value \
+                .replace("\\n", '') \
+                .replace("\n", '')  \
+                .replace("'", '"')  \
+                .replace('"{', '{') \
+                .replace('}"', '}') \
+                .replace('"[', '[') \
+                .replace(']"', ']')
+        )
+    else:
+        card = value
+    
     try:
-        cards = [ dictkeys_to_lower(card) for card in cards ]
+        if isinstance(value, dict):
+            cards = [ dictkeys_to_lower(value) ]
+        elif isinstance(value, list):
+            cards = [ dictkeys_to_lower(c) for c in value ]
     except:
         raise ValueError(f'`cards` is not a list of dictionaries')
-
-    card_kwargs = {
-        'scryfall_id': str,
-        'amount':      to_amount,
-        'tag':         to_json,
-        'foil':        to_bool,
-        'condition':   CardCondition.parse,
-        'signed':      to_bool,
-        'altered':     to_bool,
-        'misprint':    to_bool
-    }
 
     for card in cards:
         for k,v in card.items():
@@ -83,4 +89,4 @@ def to_card_list(value) -> List[dict]:
                 raise ValueError(f'`{k}` is not a valid card field')
             card[k] = card_kwargs[k](v)
 
-    return cards
+    return cards[0] if isinstance(value, dict) else cards

@@ -16,10 +16,8 @@ Feel free to contact me for any question.
 
 * [Authentication](#authentication)
     * `/auth` or `/auth/users`
-        * `POST`/`GET`: Login using a username and password combination.
+        * `POST`, `GET`: Login using a username and password combination **or** a JWT access token.
         * `PUT`: Register a new user.
-    * `/auth/jwt`
-        * `POST`/`GET`: Login using an access token.
 * [Collections](#collections)
     * `/collections`
         * `GET`: Retrieve cards from active user's collection.
@@ -51,7 +49,7 @@ Response:
 {
     "msg": "user created",
     "username": {:string},
-    "access-token": f'Bearer {:string}'
+    "access-token": {:string}
 }
 ```
 
@@ -74,7 +72,7 @@ Response:
 {
     "msg": "successfuly logged in",
     "username": {:string},
-    "access-token": f'Bearer {:string}'
+    "access-token": {:string}
 }
 ```
 
@@ -82,29 +80,11 @@ Response:
 
 | Name     | Location   | Type       | Description |
 |----------|------------|------------|-------------|
-| username | JSON Body / URL Arguments | `string` | - |
-| password | JSON Body / URL Arguments | `string` | - |
-
-### Re-Login ###
-
-Re-login using a saved JWT Token.
-
-```
-GET  /auth/jwt HTTP/1.1
-POST /auth/jwt HTTP/1.1
-
-Response:
-{
-    "msg": "successfuly logged in",
-    "username": {:string}
-}
-```
-
-#### Parameters ####
-
-| Name     | Location   | Type       | Description |
-|----------|------------|------------|-------------|
+| username | JSON Body / URL Parameters | `string` | - |
+| password | JSON Body / URL Parameters | `string` | - |
 | Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+
+* **Note: Send either a username&password combination or an authorization token.**
 
 ---
 
@@ -149,8 +129,9 @@ Response:
 | Name     | Location   | Type       | Default Value | Description |
 |----------|------------|------------|---------------|-------------|
 | Authorization | Header | `Bearer Access-Token` | - | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
-| page      | JSON Body / URL Arguments | `int`  | `1`  | Pagination page number, indexing starts from 1 |
-| per_page  | JSON Body / URL Arguments | `int`  | `20` | Amount of cards per page |
+| page      | JSON Body / URL Parameters | `int`  | `1`  | Pagination page number, indexing starts from 1 |
+| per_page  | JSON Body / URL Parameters | `int`  | `20` | Amount of cards per page |
+| cards[$]._id  | JSON Body | `{:string}`  | `[]` | List of objects, each contains an `_id` field. Card IDs to retrieve. If not specified, all cards are retrieved. |
 
 ### Get All Cards ###
 
@@ -185,9 +166,10 @@ Response:
 
 #### Parameters ####
 
-| Name     | Location   | Type       | Description |
-|----------|------------|------------|-------------|
-| Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+| Name     | Location   | Type       | Default Value | Description |
+|----------|------------|------------|---------------|-------------|
+| Authorization | Header | `Bearer Access-Token` | - | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+| cards[$]._id  | JSON Body | `{:string}`  | `[]` | List of objects, each contains an `_id` field. Card IDs to retrieve. If not specified, all cards are retrieved. |
 
 ### Clear Collection ###
 
@@ -231,10 +213,10 @@ Response:
 
 #### Parameters ####
 
-| Name     | Location   | Type       | Description |
-|----------|------------|------------|-------------|
-| Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
-| cards | JSON Body | `List[Card]` | List of cards to be deleted from the collection. Only `Card.card_id` is actually used for the deletion operation. |
+| Name     | Location   | Type       | Default Value | Description |
+|----------|------------|------------|---------------|-------------|
+| Authorization | Header | `Bearer Access-Token` | - | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
+| cards[$]._id  | JSON Body | `{:string}`  | `[]` | List of objects, each contains an `_id` field. Card IDs to delete, if not specified nothing will happen. |
 
 ### Add or Update Collection ###
 
@@ -277,7 +259,8 @@ POST /cards/<card_id> HTTP/1.1
 Response:
 {
     "_id": {:string},
-    /* including all affected fields and their new values */
+    "scryfall_id": {:string},
+    /* includes all affected fields and their new values */
 }
 ```
 

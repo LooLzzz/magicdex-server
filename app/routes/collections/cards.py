@@ -1,7 +1,7 @@
 from flask_restful import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from .__utils import data_validator, parsers
+from .route_utils import data_validator, parsers
 from ...models import UserModel
 
 
@@ -34,7 +34,7 @@ class CardEndpoint(Resource):
                 .update(**kwargs) \
                 .save()
 
-        fields = ['_id'] + list(kwargs.keys())
+        fields = {'_id', 'scryfall_id'} | set(kwargs.keys())
         return { k:v for k,v in user.collection[card_id].to_JSON().items() if k in fields }
     
     @jwt_required()

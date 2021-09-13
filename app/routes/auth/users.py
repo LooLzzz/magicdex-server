@@ -1,5 +1,6 @@
 from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ...utils import UserAlreadyExists, UserDoesNotExist, get_arg_dict #, get_arg_list
 from ...models import UserModel
@@ -14,30 +15,40 @@ class UsersEndpoint(Resource):
     ## `/auth[/users]` ENDPOINT
 
     ### POST/GET
-    Login using a username and password combination.
+    Login using a username and password combination **or** a JWT access token.
     
     ### PUT
-    Register a new user a username and password combination.
+    Register a new user using a username and password combination.
     '''
+    @jwt_required(optional=True)
     def post(self):
-        kwargs = get_arg_dict(parser)
-        user = UserModel(username=kwargs['username'])
+        jwt_identity = get_jwt_identity()
+        
+        if jwt_identity:
+            user_id, username = jwt_identity
+            return {
+                'msg': f'successfuly logged in',
+                'username': username
+            }
+        else:
+            kwargs = get_arg_dict(parser)
+            user = UserModel(username=kwargs['username'])
+            try:
+                if user.check_password_hash(kwargs['password']):
+                    return {
+                        'msg': f'successfuly logged in',
+                        'username': kwargs['username'],
+                        'access-token': user.create_access_token() # will raise an exception if the user does not exist
+                    }
+                else:
+                    raise UserDoesNotExist
+            except UserDoesNotExist as e:
+                return (
+                    { 'msg': 'username and password combination not found' },
+                    401
+                )
 
-        try:
-            if user.check_password_hash(kwargs['password']):
-                return {
-                    'msg': f'successfuly logged in',
-                    'username': kwargs['username'],
-                    'access-token': user.create_access_token() # will raise an exception if the user does not exist
-                }
-            else:
-                raise UserDoesNotExist
-        except UserDoesNotExist as e:
-            return (
-                { 'msg': 'username and password combination not found' },
-                401
-            )
-
+    @jwt_required(optional=True)
     def get(self):
         return self.post()
        

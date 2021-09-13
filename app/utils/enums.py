@@ -35,6 +35,10 @@ class DatabaseOperation(_BaseEnum):
                     pass
         raise EnumParsingError(f'Unable to parse value to Operation Enum: `{value}`')
 
+    def __eq__(self, other):
+        return super().__eq__(other) or \
+                self.to_past_tense() == other.upper()
+
     def to_past_tense(self):
         if self == DatabaseOperation.CREATE:
             return 'CREATED'

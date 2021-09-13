@@ -69,25 +69,26 @@ class CollectionModel():
         JSON representation of this `CollectionModel`, used for JSON serialization.
         '''
         res = {
-            # '_id': self._id if to_mongo else str(self._id),
-            # '_id': self._id if to_mongo else {'$oid': str(self._id)},
             'user_id': self.user_id if to_mongo else str(self.user_id),
-            'doc_count': self.parent.doc_count(),
+            # 'doc_count': parent.doc_count(),
+            'doc_count': len(self._cards),
             'cards': [ card.to_JSON(to_mongo, cards_drop_cols) for card in self._cards.values() ],
         }
         return { k:v for k,v in res.items() if k not in drop_cols }
 
-    def load(self, page:int=1, per_page:int=20):
+    def load(self, page:int=1, per_page:int=20, cards:List[CardModel]=[]):
         '''
         Loads cards from the database.
 
         :param page: Page number
         :param per_page: Number of cards per page
+        :param cards: List of cards. To load all cards pass `cards=[]`. Defaults to `[]`
         :return: An updated `CollectionModel` object
         '''
         skip_amount = (page - 1) * per_page
+        doc_count = len(cards) if cards else self.parent.doc_count()
 
-        if skip_amount >= self.parent.doc_count():
+        if skip_amount >= doc_count:
             abort(make_response(
                 jsonify({
                     'msg': 'pagination page out of bounds',
@@ -98,21 +99,28 @@ class CollectionModel():
             ))
         else:
             data = cards_db \
-                .find({ 'user_id': ObjectId(self.user_id) }) \
+                .find({
+                    'user_id': ObjectId(self.user_id),
+                    '_id': { '$in': [ card._id for card in cards ] } if cards
+                                                                     else { '$exists': True }
+                }) \
                 .skip(skip_amount) \
                 .limit(per_page)
             self._cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
     
-    def load_all(self):
+    def load_all(self, cards:List[CardModel]=[]):
         '''
         Loads all cards from the database.
         
+        :param cards: List of cards. To load all cards pass `cards=[]`. Defaults to `[]`
         :return: An updated `CollectionModel` object
         '''
-        data = cards_db.find(
-            { 'user_id': ObjectId(self.user_id) }
-        )
+        data = cards_db.find({
+            'user_id': ObjectId(self.user_id),
+            '_id': { '$in': [ card._id for card in cards ] } if cards
+                                                             else { '$exists': True }
+        })
         self._cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
 
@@ -155,7 +163,8 @@ class CollectionModel():
                     'action': 'DELETED'
                 }]
         else:
-            for card in self._cards.values():
+            cards = list(self._cards.values())
+            for card in cards:
                 res += [ card.save() ]
         
         return res

@@ -7,4 +7,3 @@ Contains two endpoints accesible by:
 '''
 
 from .users import UsersEndpoint
-from .jwt import JwtEndpoint
