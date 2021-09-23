@@ -12,4 +12,4 @@ class PhashEndpoint(Resource):
     Retrieves an initial phash pickle file
     '''
     def get(self):
-        return redirect('https://github.com/LooLzzz/magicdex-server/raw/phash/border_crop.pickle', 308)
+        return redirect('https://github.com/LooLzzz/magicdex-server/raw/phash/image_data.pickle', 308)

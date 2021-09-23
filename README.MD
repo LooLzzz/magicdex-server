@@ -320,5 +320,5 @@ Mostly used for an easier starting point when `magicdex-desktop` is installed on
 ```
 GET /cards/phash HTTP/1.1
 
-308 Redirect: "https://github.com/LooLzzz/magicdex-server/raw/phash/border_crop.pickle"
+308 Redirect: "https://github.com/LooLzzz/magicdex-server/raw/phash/image_data.pickle"
 ```
