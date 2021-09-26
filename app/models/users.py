@@ -6,7 +6,7 @@ from flask_jwt_extended import create_access_token
 from pymongo import ReturnDocument
 
 from ..utils import UserDoesNotExist, UserAlreadyExists
-from .. import bcrypt, users_db
+from .. import bcrypt, users_db, cards_db
 from . import CollectionModel, CardModel
 
 
@@ -58,28 +58,7 @@ class UserModel():
         
         :return: Number of document cards in the collection
         '''
-        data = users_db.find_one(
-            { '_id': ObjectId(self.user_id) } # filter
-        )
-        return data['doc_count']
-
-    def inc_doc_count(self, amount:int):
-        '''
-        Increments the number of document cards in the collection by `amount`.
-
-        :param amount: The amount to increment
-        :return: The new document count
-        '''
-        res = users_db.find_one_and_update(
-            filter = { '_id': self.user_id },
-            update = {
-                '$inc': {
-                    'doc_count': amount
-                }
-            },
-            return_document = ReturnDocument.AFTER
-        )
-        return res['doc_count']
+        return cards_db.count_documents({ 'user_id': self.user_id })
 
     @exist_required()
     def check_password_hash(self, password):
@@ -138,8 +117,6 @@ class UserModel():
             'username': self.username,
             'password': bcrypt.generate_password_hash(password).decode('utf-8'),
             'date': datetime.now(),
-            'doc_count': 0
         }).inserted_id
         
-        # CollectionModel.create(user_id)
         return UserModel(user_id=str(user_id))

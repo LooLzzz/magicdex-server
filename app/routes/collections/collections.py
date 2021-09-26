@@ -4,7 +4,7 @@ from flask_restful import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from .route_utils import data_validator, parsers
-from ...utils import get_arg_list, DatabaseOperation
+from ...utils import get_arg_dict, get_arg_list, DatabaseOperation
 from ...models import UserModel, CardModel
 
 
@@ -26,7 +26,9 @@ class CollectionsEndpoint(Resource):
     @jwt_required()
     @data_validator(parsers.cardlist_parser)
     def get(self, user:UserModel, cards:List[CardModel]):
-        page, per_page = get_arg_list(parsers.pagination_parser)
+        # page, per_page = get_arg_list(parsers.pagination_parser)
+        args = get_arg_dict(parsers.pagination_parser)
+        page, per_page = args['page'], args['per_page']
 
         data = user.collection \
                 .load(page, per_page, cards) \
@@ -43,8 +45,8 @@ class CollectionsEndpoint(Resource):
         if page * per_page < data['doc_count']:
             # show url for the next page if there are cards left to show
             page += 1
-            args = '&'.join([ f'{k}={repr(v)}' for k,v in (page, per_page) ])
-            res['next_page'] = f'{os.environ["APP_URL"]}/collections?{args}'
+            args = '&'.join([ f'{k}={v}' for k,v in args.items() ])
+            res['next_page'] = f'{os.getenv("APP_URL")}/collections?{args}'
         
         return res
 

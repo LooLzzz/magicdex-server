@@ -55,14 +55,22 @@ class CollectionModel():
     def __repr__(self):
         return repr(self._cards)
 
-    def inc_doc_count(self, amount:int):
+    def doc_count(self):
         '''
-        Increments the number of document cards in the collection by `amount`.
+        Retrieves the number of document cards in the collection from the database.
+        
+        :return: Number of document cards in the collection
+        '''
+        return self.parent.doc_count()
 
-        :param amount: The amount to increment
-        :return: The new document count
-        '''
-        return self.parent.inc_doc_count(amount)
+    # def inc_doc_count(self, amount:int):
+    #     '''
+    #     Increments the number of document cards in the collection by `amount`.
+
+    #     :param amount: The amount to increment
+    #     :return: The new document count
+    #     '''
+    #     return self.parent.inc_doc_count(amount)
 
     def to_JSON(self, to_mongo=False, drop_cols=[], cards_drop_cols=[]):
         '''
@@ -86,13 +94,13 @@ class CollectionModel():
         :return: An updated `CollectionModel` object
         '''
         skip_amount = (page - 1) * per_page
-        doc_count = len(cards) if cards else self.parent.doc_count()
+        doc_count = len(cards) if cards else self.doc_count()
 
         if skip_amount >= doc_count:
             abort(make_response(
                 jsonify({
                     'msg': 'pagination page out of bounds',
-                    'first_page': f'{os.environ["APP_URL"]}/collections?page=1&per_page={per_page}',
+                    'first_page': f'{os.getenv("APP_URL")}/collections?page=1&per_page={per_page}',
                     'data': []
                 }),
                 200
@@ -101,7 +109,7 @@ class CollectionModel():
             data = cards_db \
                 .find({
                     'user_id': ObjectId(self.user_id),
-                    '_id': { '$in': [ card._id for card in cards ] } if cards
+                    '_id': { '$in': [ card._id for card in cards ] } if cards # if a list of cards is provided, then return only those card ids
                                                                      else { '$exists': True }
                 }) \
                 .skip(skip_amount) \
@@ -123,20 +131,6 @@ class CollectionModel():
         })
         self._cards = { item['_id']: CardModel(self, **item) for item in data }
         return self
-
-    @classmethod
-    def create(cls, user_id:Union[ObjectId, str]):
-        '''
-        Creates a new collection and saves it to the database.
-
-        :param user_id: The id of the user that owns the collection
-        :returns: `InsertOneResult` object
-        '''
-        return { 'msg': '`CollectionModel.create()` method is deprecated' }
-        # return collections_db.insert_one({
-        #     'user_id': ObjectId(user_id),
-        #     'cards': [],
-        # })
 
     def save(self):
         '''

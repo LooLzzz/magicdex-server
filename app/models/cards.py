@@ -164,7 +164,7 @@ class CardModel():
         
         :return: An updated `CardModel` instance
         '''
-        self.amount = int(self.amount) if self.amount and int(self.amount) > 0 else 1
+        self.amount = int(self.amount) if self.amount else 1
         self.tag = self.tag if self.tag else []
         self.foil = self.foil if self.foil else False
         self.condition = self.condition if self.condition else CardCondition['NM']
@@ -220,7 +220,6 @@ class CardModel():
         res = cards_db.insert_one(
             { **self.to_JSON(to_mongo=True, drop_cols=['_id']) }
         )
-        self.parent.inc_doc_count(1)
         self._id = res.inserted_id
         
         del self.parent[old_id]
@@ -233,7 +232,6 @@ class CardModel():
         Deletes this `CardModel` instance from the database.
         Internal method, should not be called directly, use `CardModel.save()` instead.
         '''
-        self.parent.inc_doc_count(-1)
         return cards_db.delete_one(
             { '_id': self._id } # card_id
         )
@@ -260,11 +258,8 @@ class CardModel():
         :raises Exception: If the operation fails
         :return: A Dictionary containing operation info
         '''
-        res = {
-            '_id': str(self._id),
-            'action': self.operation.to_past_tense()
-        }
-        
+        res = { }
+
         if self.operation == DatabaseOperation.NOP:
             res['msg'] = '`_id` not found in collection'
             res['extra_info'] = "when creating a new card, leave it's `_id` field empty"
@@ -274,9 +269,15 @@ class CardModel():
             self._update()
             res['card'] = self.to_JSON(drop_cols=['user_id'])
         elif self.operation == DatabaseOperation.CREATE:
-            self._create()
-            res['card'] = self.to_JSON(drop_cols=['user_id'])
+            if self.operation == DatabaseOperation.CREATE and self.amount <= 0:
+                self.operation = DatabaseOperation.NOP
+                res['msg'] = '`amount` must be greater than 0 when creating a new card'
+            else:
+                self._create()
+                res['card'] = self.to_JSON(drop_cols=['user_id'])
         else:
             raise Exception('Invalid operation')
                 
+        res['_id']    = str(self._id)
+        res['action'] = self.operation.to_past_tense()
         return res
