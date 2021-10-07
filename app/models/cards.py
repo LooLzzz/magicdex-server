@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Union
 from flask import abort, jsonify, make_response
 from bson.objectid import ObjectId
@@ -12,7 +13,7 @@ class CardModel():
     DatabaseOperation = DatabaseOperation
 
     def __init__(self, parent=None, scryfall_id:str=None, _id:Union[str, ObjectId]=None, user_id:Union[str, ObjectId]=None, amount:Union[int, str]=None, tag:Union[str, dict]=None, foil:bool=None,
-                       condition:Union[CardCondition, int, str]=None, signed:bool=None, altered:bool=None, misprint:bool=None,
+                       condition:Union[CardCondition, int, str]=None, signed:bool=None, altered:bool=None, misprint:bool=None, date_created:datetime=None,
                        operation:Union[DatabaseOperation, int, str]=DatabaseOperation.UPDATE, fetch_data_by_id=False):
         '''
         :raises ValueError: when neither `scryfall_id` nor `_id` is provided
@@ -41,16 +42,29 @@ class CardModel():
         self.parent = parent
         self.user_id = ObjectId(user_id) if user_id else user_id
         self._id = ObjectId(_id) if _id else _id
-        self.scryfall_id = data['scryfall_id'] if data else scryfall_id
-        self.amount = data['amount'] if data else amount
-        self.tag = data['tag'] if data else tag
-        self.foil = data['foil'] if data else foil
-        self.condition = CardCondition.parse(data['condition'] if data else condition)
-        self.signed = data['signed'] if data else signed
-        self.altered = data['altered'] if data else altered
-        self.misprint = data['misprint'] if data else misprint
         self.operation = DatabaseOperation.parse(operation)
-
+        
+        if data:
+            self.scryfall_id = data['scryfall_id']
+            self.amount = data['amount']
+            self.tag = data['tag']
+            self.foil = data['foil']
+            self.condition = CardCondition.parse(data['condition'])
+            self.signed = data['signed']
+            self.altered = data['altered']
+            self.misprint = data['misprint']
+            self.date_created = data['date_created']
+        else:
+            self.scryfall_id = scryfall_id
+            self.amount = amount
+            self.tag = tag
+            self.foil = foil
+            self.condition = CardCondition.parse(condition)
+            self.signed = signed
+            self.altered = altered
+            self.misprint = misprint
+            self.date_created = date_created
+        
     @classmethod
     def get_card_data_by_id(cls, card_id:Union[ObjectId, str]):
         data = cards_db.find_one(
@@ -120,13 +134,14 @@ class CardModel():
             '_id': self._id if to_mongo else str(self._id),
             'user_id': self.user_id if to_mongo else str(self.user_id),
             'scryfall_id': self.scryfall_id,
-            'amount': self.amount if self.amount else 1,
-            'tag': self.tag if self.tag else [],
-            'foil': self.foil if self.foil else False,
+            'amount': self.amount or 1,
+            'tag': self.tag or [],
+            'foil': self.foil or False,
             'condition': self.condition.name if self.condition else CardCondition['NM'].name,
-            'signed': self.signed if self.signed else False,
-            'altered': self.altered if self.altered else False,
-            'misprint': self.misprint if self.misprint else False,
+            'signed': self.signed or False,
+            'altered': self.altered or False,
+            'misprint': self.misprint or False,
+            'date_created': self.date_created if to_mongo else self.date_created.replace(microsecond=0).isoformat(),
         }
         return { k:v for k,v in res.items() if k not in drop_cols }
 
@@ -149,6 +164,7 @@ class CardModel():
             'signed': self.signed,
             'altered': self.altered,
             'misprint': self.misprint,
+            'date_created': self.date_created,
             'operation': self.operation,
         }
         res = { k:v for k,v in res.items() if v is not None } if drop_none else res
@@ -165,12 +181,13 @@ class CardModel():
         :return: An updated `CardModel` instance
         '''
         self.amount = int(self.amount) if self.amount else 1
-        self.tag = self.tag if self.tag else []
-        self.foil = self.foil if self.foil else False
-        self.condition = self.condition if self.condition else CardCondition['NM']
-        self.signed = self.signed if self.signed else False
-        self.altered = self.altered if self.altered else False
-        self.misprint = self.misprint if self.misprint else False
+        self.tag = self.tag or []
+        self.foil = self.foil or False
+        self.condition = self.condition or CardCondition['NM']
+        self.signed = self.signed or False
+        self.altered = self.altered or False
+        self.misprint = self.misprint or False
+        # self.date_created = self.date_created or datetime.now()
         return self
 
     def update(self, **kwargs):
@@ -218,7 +235,10 @@ class CardModel():
         old_id = self._id
         
         res = cards_db.insert_one(
-            { **self.to_JSON(to_mongo=True, drop_cols=['_id']) }
+            {
+                **self.to_JSON(to_mongo=True, drop_cols=['_id']),
+                'date_created': datetime.now(),
+            }
         )
         self._id = res.inserted_id
         

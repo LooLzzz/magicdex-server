@@ -117,7 +117,8 @@ Response:
             "foil": {:bool},
             "signed": {:bool},
             "altered": {:bool},
-            "misprint": {:bool}
+            "misprint": {:bool},
+            "date_created": {:datetime}
         },
         {...},
     ]
@@ -157,7 +158,8 @@ Response:
             "foil": {:bool},
             "signed": {:bool},
             "altered": {:bool},
-            "misprint": {:bool}
+            "misprint": {:bool},
+            "date_created": {:datetime}
         },
         {...},
     ]
@@ -300,7 +302,8 @@ Response:
     "foil": {:bool},
     "signed": {:bool},
     "altered": {:bool},
-    "misprint": {:bool}
+    "misprint": {:bool},
+    "date_created": {:datetime}
 }
 ```
 

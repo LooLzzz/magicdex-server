@@ -116,7 +116,7 @@ class UserModel():
         user_id = users_db.insert_one({
             'username': self.username,
             'password': bcrypt.generate_password_hash(password).decode('utf-8'),
-            'date': datetime.now(),
+            'date_created': datetime.now(),
         }).inserted_id
         
         return UserModel(user_id=str(user_id))
