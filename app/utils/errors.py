@@ -1,4 +1,3 @@
-# import json
 
 class UserDoesNotExist(ValueError):
     pass

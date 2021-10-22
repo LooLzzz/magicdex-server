@@ -1,9 +1,8 @@
 import re
 from datetime import datetime
-from typing import Union, List
+from typing import Union
 from bson import ObjectId
 from flask_jwt_extended import create_access_token
-from pymongo import ReturnDocument
 
 from ..utils import UserDoesNotExist, UserAlreadyExists
 from .. import bcrypt, users_db, cards_db
@@ -47,6 +46,7 @@ class UserModel():
             self.user_id = user['_id']
             self.username = user['username']
             self.password_hash = user['password']
+            self.public = user['public']
             self.collection = CollectionModel(parent=self)
 
     def __bool__(self):
@@ -116,6 +116,7 @@ class UserModel():
         user_id = users_db.insert_one({
             'username': self.username,
             'password': bcrypt.generate_password_hash(password).decode('utf-8'),
+            'public': True,
             'date_created': datetime.now(),
         }).inserted_id
         

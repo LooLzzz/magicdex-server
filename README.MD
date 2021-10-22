@@ -15,25 +15,33 @@ Feel free to contact me for any question.
 ## API Overview ##
 
 * [Authentication](#authentication)
-    * `/auth` or `/auth/users`
-        * `POST`, `GET`: Login using a username and password combination **or** a JWT access token.
-        * `PUT`: Register a new user.
+  * `/auth` or `/auth/users`
+    * `POST`, `GET`: Login using a username and password combination **or** a JWT access token.
+    * `PUT`: Register a new user.
 * [Collections](#collections)
-    * `/collections`
-        * `GET`: Retrieve cards from active user's collection.
-        * `POST`: Insert or update cards from active user's collection.
-        * `DELETE`: Delete cards from active user's collection.
-    * `/collections/all`
-        * `GET`: Retrieve **all** cards from active user's collection.
-        * `DELETE`: Clear active user's collection.
-    * `/collections/<:card_id>`
-        * `GET`: Retrieve a specific card from active user's collection.
-        * `POST`: Update a specific card from active user's collection.
-        * `DELETE`: Delete a specific card from active user's collection.
-* [Cards](#cards)
-    * `/cards/phash`
-        * `GET`: Retrieves an initial phash pickle file.
+  * `/collections`
+    * `GET`: Retrieve cards from active user's collection.
+    * `POST`: Insert or update cards from active user's collection.
+    * `DELETE`: Delete cards from active user's collection.
+  * `/collections/all`
+    * `GET`: Retrieve **all** cards from active user's collection.
+    * `DELETE`: Clear active user's collection.
+  * `/collections/<:card_id>`
+    * `GET`: Retrieve a specific card from active user's collection.
+    * `POST`: Update a specific card from active user's collection.
+    * `DELETE`: Delete a specific card from active user's collection.
+* [Users](#users)
+  * `/users/<:username>/collections`
+    * `GET`: Retrieve cards from user's collection.
+  * `/users/<:username>/collections/all`
+    * `GET`: Retrieve **all** cards from user's collection.
+  * `/users/<:username>/collections/<:card_id>`
+    * `GET`: Retrieve a specific card from user's collection.
+* [Phash](#phash)
+  * `/phash`
+    * `GET`: Retrieves an initial phash pickle file.
 
+---
 ---
 
 ## Authentication Endpoint <a name="authentication"></a> ##
@@ -47,7 +55,7 @@ PUT /auth/users HTTP/1.1
 
 Response:
 {
-    "msg": "user created",
+    "message": "user created",
     "username": {:string},
     "access-token": {:string}
 }
@@ -70,7 +78,7 @@ POST /auth/users HTTP/1.1
 
 Response:
 {
-    "msg": "successfuly logged in",
+    "message": "successfuly logged in",
     "username": {:string},
     "access-token": {:string}
 }
@@ -86,6 +94,7 @@ Response:
 
 * **Note: Send either a username&password combination or an authorization token.**
 
+---
 ---
 
 ## Collections Endpoint <a name="collections"></a> ##
@@ -248,15 +257,15 @@ Response:
 
 * Should be a list of cards, each object can contain any number of fields from `Update A Card` section.
 * When inserting a new card:
-    * `_id` field should be empty.
-    * If a field is not present or `null`, it's default value will be used instead.
+  * `_id` field should be empty.
+  * If a field is not present or `null`, it's default value will be used instead.
 
 ### Update A Card ###
 
 Updates a specific card in the *active* user's collection.
 
 ```
-POST /cards/<card_id> HTTP/1.1
+POST /collections/<:card_id> HTTP/1.1
 
 Response:
 {
@@ -287,7 +296,7 @@ Response:
 Retrieves a specific card in the *active* user's collection.
 
 ```
-GET /cards/<:card_id> HTTP/1.1
+GET /collections/<:card_id> HTTP/1.1
 
 Response:
 {
@@ -313,15 +322,135 @@ Response:
 |----------|------------|------------|-------------|
 | Authorization | Header | `Bearer Access-Token` | The JWT token to be used for authentication. The value should be in the form of `"Bearer {token:string}"` |
 
-## Cards Endpoint <a name="cards"></a> ##
+---
+---
+
+## Users Endpoint <a name="users"></a> ##
+
+* Please note that accessing user's information requires the user to have set his profile public.
+
+### Get Cards ###
+
+Retrieves a list of cards from a user's collection.  
+Supports pagination.
+
+```
+GET POST users/<:username>/collections HTTP/1.1
+
+Response:
+{
+    "page": {:int},
+    "per_page": {:int},
+    "total_documents": {:int}, /* only present in the first page */
+    "next_page": {:stringUrl}, /* not present in the last page */
+    "data": [
+        {
+            "_id": {:string},
+            "scryfall_id": {:string},
+            "amount": {:int},
+            "tag": [
+                {:string},
+                ...
+            ],
+            "condition": {:stringEnum[NM, LP, MP, HP, DAMAGED]},
+            "foil": {:bool},
+            "signed": {:bool},
+            "altered": {:bool},
+            "misprint": {:bool},
+            "date_created": {:datetime}
+        },
+        {...},
+    ]
+}
+```
+
+#### Parameters ####
+
+| Name     | Location   | Type       | Default Value | Description |
+|----------|------------|------------|---------------|-------------|
+| page      | JSON Body / URL Parameters | `int`  | `1`  | Pagination page number, indexing starts from 1 |
+| per_page  | JSON Body / URL Parameters | `int`  | `20` | Amount of cards per page |
+| cards[$]._id  | JSON Body | `{:string}`  | `[]` | List of objects, each contains an `_id` field. Card IDs to retrieve. If not specified, all cards are retrieved. |
+
+### Get All Cards ###
+
+Retrieves all cards from a user's collection.  
+Does not use pagination.
+
+```
+GET POST /users/<:username>/all HTTP/1.1
+
+Response:
+{
+    "total_documents": {:int},
+    "data": [
+        {
+            "_id": {:string},
+            "scryfall_id": {:string},
+            "amount": {:int},
+            "tag": [
+                {:string},
+                ...
+            ],
+            "condition": {:stringEnum[NM, LP, MP, HP, DAMAGED]},
+            "foil": {:bool},
+            "signed": {:bool},
+            "altered": {:bool},
+            "misprint": {:bool},
+            "date_created": {:datetime}
+        },
+        {...},
+    ]
+}
+```
+
+#### Parameters ####
+
+| Name     | Location   | Type       | Default Value | Description |
+|----------|------------|------------|---------------|-------------|
+| cards[$]._id  | JSON Body | `{:string}`  | `[]` | List of objects, each contains an `_id` field. Card IDs to retrieve. If not specified, all cards are retrieved. |
+
+### Get A Card ###
+
+Retrieves a specific card in a user's collection.
+
+```
+GET POST /users/<:username>/collections/<:card_id> HTTP/1.1
+
+Response:
+{
+    "_id": {:string},
+    "scryfall_id": {:string},
+    "amount": {:int},
+    "tag": [
+        {:string},
+        ...
+    ],
+    "condition": {:stringEnum[NM, LP, MP, HP, DAMAGED]},
+    "foil": {:bool},
+    "signed": {:bool},
+    "altered": {:bool},
+    "misprint": {:bool},
+    "date_created": {:datetime}
+}
+```
+
+#### Parameters ####
+
+* None
+
+---
+---
+
+## Phash Endpoint <a name="phash"></a> ##
 
 ### Request Initial Phash Pickle ####
 
 Retrieves an initial phash pickle file.  
-Mostly used for an easier starting point when `magicdex-desktop` is installed on a new machine.
+Mostly used for an easier starting point when [`magicdex-desktop`](github.com/LooLzzz/magicdex-desktop) is installed on a new machine.
 
 ```
-GET /cards/phash HTTP/1.1
+GET /phash HTTP/1.1
 
 308 Redirect: "https://github.com/LooLzzz/magicdex-server/raw/phash/image_data.pickle"
 ```

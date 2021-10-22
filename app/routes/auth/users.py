@@ -27,7 +27,7 @@ class UsersEndpoint(Resource):
         if jwt_identity:
             user_id, username = jwt_identity
             return {
-                'msg': f'successfuly logged in',
+                'message': f'successfuly logged in',
                 'username': username
             }
         else:
@@ -36,7 +36,7 @@ class UsersEndpoint(Resource):
             try:
                 if user.check_password_hash(kwargs['password']):
                     return {
-                        'msg': f'successfuly logged in',
+                        'message': f'successfuly logged in',
                         'username': kwargs['username'],
                         'access-token': user.create_access_token() # will raise an exception if the user does not exist
                     }
@@ -44,7 +44,7 @@ class UsersEndpoint(Resource):
                     raise UserDoesNotExist
             except UserDoesNotExist as e:
                 return (
-                    { 'msg': 'username and password combination not found' },
+                    { 'message': 'username and password combination not found' },
                     401
                 )
 
@@ -60,7 +60,7 @@ class UsersEndpoint(Resource):
             user = user.create(kwargs['password'])
             return (
                 {
-                    'msg': 'user created',
+                    'message': 'user created',
                     'username': kwargs['username'],
                     'access-token': user.create_access_token()
                 },
@@ -69,7 +69,7 @@ class UsersEndpoint(Resource):
         except UserAlreadyExists as e:
             return (
                 {
-                    'msg': 'username already exists',
+                    'message': 'username already exists',
                     'username': kwargs['username'],
                 },
                 400

@@ -1,5 +1,4 @@
 import re, json
-from typing import Union, List, Dict
 
 from .errors import BooleanParsingError
 from .enums import CardCondition
