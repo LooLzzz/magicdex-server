@@ -2,12 +2,14 @@ from flask_restful import Resource
 from flask_restful.reqparse import RequestParser
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from ...utils import UserAlreadyExists, UserDoesNotExist, get_arg_dict #, get_arg_list
+from ...utils import UserAlreadyExists, UserDoesNotExist
+from ...utils import get_arg_dict, to_bool
 from ...models import UserModel
 
-parser = RequestParser(bundle_errors=True)
-parser.add_argument('username', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=False, type=str)
-parser.add_argument('password', location=['form', 'args', 'json'], required=True, nullable=False, case_sensitive=True, type=str)
+parser = RequestParser(bundle_errors=True, trim=True)
+parser.add_argument('username', location=['form', 'args', 'json'], required=True,  nullable=False, case_sensitive=True,  type=str)
+parser.add_argument('password', location=['form', 'args', 'json'], required=True,  nullable=False, case_sensitive=True,  type=str)
+parser.add_argument('public',   location=['form', 'args', 'json'], required=False, nullable=False, case_sensitive=False, type=to_bool, default=False, store_missing=False)
 
 
 class UsersEndpoint(Resource):
@@ -27,7 +29,7 @@ class UsersEndpoint(Resource):
         if jwt_identity:
             user_id, username = jwt_identity
             return {
-                'msg': f'successfuly logged in',
+                'message': f'successfuly logged in',
                 'username': username
             }
         else:
@@ -36,15 +38,15 @@ class UsersEndpoint(Resource):
             try:
                 if user.check_password_hash(kwargs['password']):
                     return {
-                        'msg': f'successfuly logged in',
-                        'username': kwargs['username'],
+                        'message': f'successfuly logged in',
+                        'username': user.username,
                         'access-token': user.create_access_token() # will raise an exception if the user does not exist
                     }
                 else:
                     raise UserDoesNotExist
             except UserDoesNotExist as e:
                 return (
-                    { 'msg': 'username and password combination not found' },
+                    { 'message': 'username and password combination not found' },
                     401
                 )
 
@@ -54,13 +56,13 @@ class UsersEndpoint(Resource):
        
     def put(self):
         kwargs = get_arg_dict(parser)
-        user = UserModel(username=kwargs['username'])
+        user = UserModel(**kwargs)
         
         try:
             user = user.create(kwargs['password'])
             return (
                 {
-                    'msg': 'user created',
+                    'message': 'user created',
                     'username': kwargs['username'],
                     'access-token': user.create_access_token()
                 },
@@ -69,7 +71,7 @@ class UsersEndpoint(Resource):
         except UserAlreadyExists as e:
             return (
                 {
-                    'msg': 'username already exists',
+                    'message': 'username already exists',
                     'username': kwargs['username'],
                 },
                 400

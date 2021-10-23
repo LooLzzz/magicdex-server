@@ -1,7 +1,5 @@
-import json
 from datetime import datetime
 from typing import Union
-from flask import abort, jsonify, make_response
 from bson.objectid import ObjectId
 
 from .. import cards_db
@@ -23,19 +21,13 @@ class CardModel():
         '''
         data = None
         if not (_id or scryfall_id):
-                raise ValueError('Either `_id` or `scryfall_id` must be provided')
-            # abort(make_response(
-            #     jsonify({
-            #         'msg': 'Either `_id` or `scryfall_id` must be provided',
-            #     }),
-            #     400
-            # ))
+            raise ValueError('Either `_id` or `scryfall_id` must be provided')
         if fetch_data_by_id:
             if not _id:
                 raise ValueError('`_id` must be provided when using `fetch_data_by_id=True`')
             data = self.get_card_data_by_id(_id)
         if isinstance(amount, str):
-            amount = amount.replace(' ','')
+            amount = amount.replace(' ', '')
         if user_id is None:
             user_id = parent.user_id
 
@@ -82,7 +74,7 @@ class CardModel():
         
         :return: `CardModel` if duplicate is found, otherwise returns None.
         '''
-        data = self.to_JSON(to_mongo=True, drop_cols=['_id', 'amount'])
+        data = self.to_JSON(to_mongo=True, drop_cols=['_id', 'amount', 'date_created'])
         res = cards_db.find_one(
             { **data }
         )
@@ -281,7 +273,7 @@ class CardModel():
         res = { }
 
         if self.operation == DatabaseOperation.NOP:
-            res['msg'] = '`_id` not found in collection'
+            res['message'] = '`_id` not found in collection'
             res['extra_info'] = "when creating a new card, leave it's `_id` field empty"
         elif self.operation == DatabaseOperation.DELETE or self.amount <= 0:
             self._delete()
@@ -291,7 +283,7 @@ class CardModel():
         elif self.operation == DatabaseOperation.CREATE:
             if self.operation == DatabaseOperation.CREATE and self.amount <= 0:
                 self.operation = DatabaseOperation.NOP
-                res['msg'] = '`amount` must be greater than 0 when creating a new card'
+                res['message'] = '`amount` must be greater than 0 when creating a new card'
             else:
                 self._create()
                 res['card'] = self.to_JSON(drop_cols=['user_id'])

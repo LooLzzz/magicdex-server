@@ -19,11 +19,27 @@ def data_validator(parser, data_mandatory=False):
     :param data_mandatory: If `True`, data received from the request must **not** be empty. Defaults to `False`.
     '''
     def outer(func):
-        def inner(self, card_id:str=None):
-            user_id, username = get_jwt_identity()
-            user = UserModel(user_id)
+        def inner(self, username:str=None, card_id:str=None):
+            user_id, identity_username = get_jwt_identity() or (None, None)
             
             try:
+                if username:
+                    user = UserModel(username=username)
+                    if not user:
+                        abort(make_response(
+                            jsonify({
+                                'message': 'user does not exist',
+                            }), 404
+                        ))
+                    if str(user.user_id) != str(user_id) and not user.public:
+                        abort(make_response(
+                            jsonify({
+                                'message': 'you are not authorized to access this resource',
+                            }), 401
+                        ))
+                else:
+                    user = UserModel(user_id=user_id)
+            
                 kwargs = get_arg_dict(parser)
                 if card_id is not None:
                     user.collection[card_id] # will load the card and throw an exception if card_id is not found
@@ -40,23 +56,14 @@ def data_validator(parser, data_mandatory=False):
                     jsonify({
                         'message': 'bad card request',
                         'errors': e.args
-                    }),
-                    400
+                    }), 400
                 ))
             except (InvalidId, KeyError) as e:
                 abort(make_response(
                     jsonify({
                         'message': 'card not found',
                         'errors': e.args
-                    }),
-                    404
-                ))
-            except Exception as e:
-                abort(make_response(
-                    jsonify({
-                        'errors': e.args
-                    }),
-                    401
+                    }), 404
                 ))
             
             return func(self, user=user, **kwargs)
@@ -68,6 +75,12 @@ class parsers():
     '''
     Parsers for the collection routes
     '''
+    user_parser = RequestParser(bundle_errors=True, trim=True)
+    user_parser.add_argument('username', location=['form', 'args', 'json'], case_sensitive=True,  store_missing=False, type=str)
+    user_parser.add_argument('password', location=['form', 'args', 'json'], case_sensitive=True,  store_missing=False, type=str)
+    user_parser.add_argument('public',   location=['form', 'args', 'json'], case_sensitive=False, store_missing=False, type=to_bool)
+    
+    
     cardlist_parser = RequestParser(bundle_errors=True, trim=True)
     cardlist_parser.add_argument('cards', location=['json'], case_sensitive=False, default=[], type=to_card, action='append')
 

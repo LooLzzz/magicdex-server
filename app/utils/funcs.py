@@ -1,5 +1,4 @@
 import re, json
-from typing import Union, List, Dict
 
 from .errors import BooleanParsingError
 from .enums import CardCondition
@@ -29,7 +28,7 @@ def to_taglist(value):
                 .replace(']"', ']')
         )
     if isinstance(value, list) and all( isinstance(value, str) for value in value ):
-        return value
+        return [ str(v).strip() for v in value ]
     raise ValueError(f'`tag` field should be an array of strings')
 
 def to_bool(s):

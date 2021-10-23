@@ -99,7 +99,7 @@ class CollectionModel():
         if skip_amount >= doc_count:
             abort(make_response(
                 jsonify({
-                    'msg': 'pagination page out of bounds',
+                    'message': 'pagination page out of bounds',
                     'first_page': f'{os.getenv("APP_URL")}/collections?page=1&per_page={per_page}',
                     'data': []
                 }),
