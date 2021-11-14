@@ -75,6 +75,19 @@ class CardModel():
         :return: `CardModel` if duplicate is found, otherwise returns None.
         '''
         data = self.to_JSON(to_mongo=True, drop_cols=['_id', 'amount', 'date_created'])
+        
+        # adjust tag filter to match all given tags, case insensitive, order insensitive
+        tags = data.pop('tag')
+        data['$and'] = [
+            { 'tag': { '$size': len(tags) }},
+            *[{
+                'tag': {
+                    '$regex': f'^{tag}$',
+                    '$options': 'i',
+                }
+            } for tag in tags],
+        ]
+        
         res = cards_db.find_one(
             { **data }
         )

@@ -1,3 +1,4 @@
+# from flask import request # for accessing request.data
 from flask import abort, jsonify, make_response
 from flask_jwt_extended import get_jwt_identity
 from flask_restful.reqparse import RequestParser

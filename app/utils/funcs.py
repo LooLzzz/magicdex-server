@@ -40,9 +40,9 @@ def to_bool(s):
     raise BooleanParsingError(f'`{s}` cannot be parsed as boolean')
 
 def to_amount(value):
-    if re.match(r'^[+\-][1-9][0-9]*', value): # look for '+X' or '-X'
-        return value
     try: # look for 'X'
+        if re.match(r'^[+\-][1-9][0-9]*', str(value)): # look for '+X' or '-X'
+            return value
         return int(value)
     except ValueError:
         raise ValueError(f'`amount` field should be the in form of one of the following: {{X, +X, -X}} where X is an integer')
@@ -84,8 +84,8 @@ def to_card(value) -> dict:
 
     for card in cards:
         for k,v in card.items():
-            if k not in card_kwargs:
-                raise ValueError(f'`{k}` is not a valid card field')
-            card[k] = card_kwargs[k](v)
+            if k in card_kwargs:
+                card[k] = card_kwargs[k](v)
+                # raise ValueError(f'`{k}` is not a valid card field')
 
     return cards[0] if isinstance(value, dict) else cards

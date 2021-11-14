@@ -1,4 +1,5 @@
 import json, os
+from datetime import datetime
 from flask import abort, jsonify, make_response
 from typing import Iterable, Union, List, Dict
 from bson import ObjectId, json_util
@@ -194,7 +195,9 @@ class CollectionModel():
                     else:
                         # found the same card as the request, but with a different id
                         data = dup.to_dict(drop_none=True)
+                        data['amount'] = f'+{data["amount"]}'
                         self[card._id].update(**data) # keep the requested card
+                        self[card._id].date_created = datetime.now()
                         self[dup._id].delete() # remove the duplicate
                 else:
                     try:
