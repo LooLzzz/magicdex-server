@@ -74,6 +74,7 @@ class CardModel():
         
         :return: `CardModel` if duplicate is found, otherwise returns None.
         '''
+        self.none_values_to_default()
         data = self.to_JSON(to_mongo=True, drop_cols=['_id', 'amount', 'date_created'])
         
         # adjust tag filter to match all given tags, case insensitive, order insensitive
@@ -185,14 +186,14 @@ class CardModel():
         
         :return: An updated `CardModel` instance
         '''
-        self.amount = int(self.amount) if self.amount else 1
+        self.amount = self.amount if self.amount is not None else 1
         self.tag = self.tag or []
         self.foil = self.foil or False
         self.condition = self.condition or CardCondition['NM']
         self.signed = self.signed or False
         self.altered = self.altered or False
         self.misprint = self.misprint or False
-        # self.date_created = self.date_created or datetime.now()
+        self.date_created = self.date_created or datetime.now()
         return self
 
     def update(self, **kwargs):
