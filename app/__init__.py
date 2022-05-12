@@ -1,36 +1,27 @@
-import os, certifi
-from datetime import timedelta
-from flask import Flask
-from flask_bcrypt import Bcrypt
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager
-from flask_pymongo import PyMongo
-from flask_restful import Api
-from flask_sslify import SSLify
+import os
 
+import dotenv
+from fastapi import FastAPI
+from motor import core as motor_core
+from motor import motor_asyncio
 
-## init flask app ##
-app = Flask(__name__)
+from .models import Card, User
 
-## config stuff ##
-app.url_map.strict_slashes = False
-app.config['PROPAGATE_EXCEPTIONS'] = True
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-app.config['MONGO_URI'] = os.getenv('MONGO_RW_URI')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(weeks=4)
+# dotenv
+dotenv.load_dotenv()
+MONGODB_URL = os.getenv('MONGODB_URL')
 
-## addons ##
-sslify = SSLify(app)
-mongo = PyMongo(app, tlsCAFile=certifi.where())
-bcrypt = Bcrypt(app)
-api = Api(app)
-jwt = JWTManager(app)
-cors = CORS(app)
+# fastapi
+app = FastAPI()
 
-## mongodb collections ##
-users_db = mongo.db['users']
-cards_db = mongo.db['cards']
+# monogdb
+mongodb_client: motor_core.AgnosticClient = motor_asyncio.AsyncIOMotorClient(
+    MONGODB_URL,
+    tls=True,
+    tlsAllowInvalidCertificates=True
+)
+users_collection: motor_core.Collection['User'] = mongodb_client['magicdex-db']['users']
+cards_collection: motor_core.Collection['Card'] = mongodb_client['magicdex-db']['cards']
 
-
-## start `main.py` !important
+# start `main.py` !important
 from . import main
