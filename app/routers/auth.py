@@ -28,7 +28,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail='Incorrect username or password',
             headers={'WWW-Authenticate': 'Bearer'},
         )
-    access_token = services.create_access_token(
+    access_token = await services.create_access_token(
         user=user,
         expires_delta=ACCESS_TOKEN_EXPIRE
     )

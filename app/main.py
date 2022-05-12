@@ -1,4 +1,4 @@
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, status
 from fastapi.responses import RedirectResponse
 
 from . import app, routers
@@ -9,7 +9,7 @@ app.include_router(routers.users_router, prefix='/users')
 
 
 @app.get('/', include_in_schema=False)
-async def nop(request: Request):
+async def nop():
     raise HTTPException(
         status_code=status.HTTP_418_IM_A_TEAPOT,
         detail='This is not the web page you are looking for'
