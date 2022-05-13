@@ -19,7 +19,7 @@ class PyObjectId(ObjectId):
 
 
 class MongoBaseModel(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId, alias='_id', exclude=True)
+    id: PyObjectId = Field(default_factory=PyObjectId, alias='_id')
 
     class Config:
         arbitrary_types_allowed = True

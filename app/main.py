@@ -3,9 +3,9 @@ from fastapi.responses import RedirectResponse
 
 from . import app, routers
 
-app.include_router(routers.auth_router, prefix='/auth')
-app.include_router(routers.cards_router, prefix='/cards')
-app.include_router(routers.users_router, prefix='/users')
+app.include_router(routers.auth_router, prefix='/auth', tags=['auth'])
+app.include_router(routers.cards_router, prefix='/cards', tags=['cards'])
+app.include_router(routers.users_router, prefix='/users', tags=['users'])
 
 
 @app.get('/', include_in_schema=False)
@@ -17,7 +17,7 @@ async def nop():
 
 
 @app.post('/token', include_in_schema=False)
-async def redirect_for_access_token():
+async def redirect_login():
     return RedirectResponse(
         url='/auth/login',
         status_code=status.HTTP_308_PERMANENT_REDIRECT

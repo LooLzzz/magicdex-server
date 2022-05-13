@@ -1,5 +1,6 @@
 bcrypt==3.2.2
 cryptography==37.0.2
+fastapi_contrib[mongo]==0.2.11
 fastapi[all]==0.77.1
 motor==3.0.0
 passlib[bcrypt]==1.7.4

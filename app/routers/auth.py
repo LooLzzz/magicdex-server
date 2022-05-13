@@ -16,8 +16,8 @@ oauth2_schema = OAuth2PasswordBearer(
 
 
 @router.post('/login', response_model=models.TokenResponse)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user: models.User = await services.authenticate_user(
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await services.authenticate_user(
         username=form_data.username,
         password=form_data.password
     )
@@ -28,12 +28,18 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail='Incorrect username or password',
             headers={'WWW-Authenticate': 'Bearer'},
         )
-    access_token = await services.create_access_token(
+
+    return await services.create_access_token(
         user=user,
         expires_delta=ACCESS_TOKEN_EXPIRE
     )
 
-    return {
-        'access_token': access_token,
-        'token_type': 'bearer'
-    }
+
+@router.put('/register', response_model=models.TokenResponse)
+async def register(form_data: models.User):
+    user = await services.create_user(form_data)
+
+    return await services.create_access_token(
+        user=user,
+        expires_delta=ACCESS_TOKEN_EXPIRE
+    )

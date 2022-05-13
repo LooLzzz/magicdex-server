@@ -1,21 +1,22 @@
 import os
 import re
 from datetime import timedelta
+from typing import TypedDict
 
-from bson import ObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 
 from .. import users_collection
-from ..models.users import Token, User
+from ..models import PyObjectId, Token, User
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = 'HS256'
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
+AccessTokenDict = TypedDict('AccessTokenT', {'access_token': str, 'token_type': str})
 
 
-async def get_user(*, id: ObjectId | None = None,
+async def get_user(*, id: PyObjectId | None = None,
                    username: str | None = None) -> User | None:
     if not any([id, username]):
         return None
@@ -44,16 +45,14 @@ async def authenticate_user(username: str, password: str) -> User | None:
     return None
 
 
-async def create_access_token(user: User, expires_delta=timedelta(minutes=15)) -> str:
-    token_data = Token(
-        sub=str(user.id),
-        exp=expires_delta
-    )
-    return jwt.encode(
-        claims=token_data.claims,
-        key=SECRET_KEY,
-        algorithm=ALGORITHM
-    )
+async def create_access_token(user: User, expires_delta=timedelta(minutes=15)) -> AccessTokenDict:
+    return {
+        'token_type': 'bearer',
+        'access_token': jwt.encode(key=SECRET_KEY,
+                                   algorithm=ALGORITHM,
+                                   claims=Token(sub=str(user.id),
+                                                exp=expires_delta).claims)
+    }
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
@@ -79,3 +78,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     if not user:
         raise credentials_exception
     return user
+
+
+async def create_user(user: User) -> User:
+    # TODO: create user
+    pass
