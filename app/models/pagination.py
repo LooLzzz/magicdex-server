@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 
 from bson import ObjectId
 from fastapi import HTTPException, status
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 _DocType = TypeVar('_DocType', bound=BaseModel)
 
@@ -13,9 +13,10 @@ class PageRequest(BaseModel):
     offset: int = Field(0, ge=0)
     limit: int | None = Field(None, ge=1)
     filter: dict[str, Any] = Field(default_factory=dict)
+    base_url_: str | None = Field(None, exclude=True)  # required for hacky fix
 
     @root_validator(pre=True)
-    def build_kwargs(cls, values: dict[str, Any]) -> dict[str, Any]:
+    def build_filter_dict(cls, values: dict[str, Any]) -> dict[str, Any]:
         all_required_field_names = {field.alias
                                     for field in cls.__fields__.values()
                                     if field.alias != 'filter'}  # to support alias
@@ -29,43 +30,55 @@ class PageRequest(BaseModel):
         return values
 
     def generate_url(self, base_url: str) -> str:
-        params = urlencode({
-            'offset': self.offset,
-            'limit': self.limit,
-            **self.filter
-        })
+        params = urlencode(
+            dict(filter(
+                lambda v: v[1] is not None,
+                {
+                    'offset': self.offset,
+                    'limit': self.limit,
+                    **self.filter
+                }.items()
+            ))
+        )
         return f'{base_url}?{params}'
+
+    def dict(self, *args, **kwargs):
+        return self  # required for hacky fix
 
 
 class Page(BaseModel, Generic[_DocType]):
     request: PageRequest
     results: list[_DocType]
-    items_left: int
+    total_items: int
+
+    @property
+    def has_next(self) -> bool:
+        return self.request.limit is not None and self.request.offset + self.request.limit < self.total_items
+
+    @property
+    def has_previous(self) -> bool:
+        return self.request.offset > 0
 
     @property
     def count(self) -> int:
         return len(self.results)
 
     @property
-    def total_items(self) -> int:
-        return self.request.offset + self.items_left
+    def items_left(self) -> int:
+        return self.total_items - self.count - self.request.offset
 
     @property
     def next(self) -> PageRequest | None:
-        next_offset = self.request.offset + (self.request.limit or 0)
-
-        if next_offset <= self.total_items:
-            return PageRequest(offset=min(next_offset, self.total_items),
+        if self.has_next:
+            return PageRequest(offset=self.request.offset + (self.request.limit or 0),
                                limit=self.request.limit,
                                filter=self.request.filter)
         return None
 
     @property
     def previous(self) -> PageRequest | None:
-        prev_offset = self.request.offset - (self.request.limit or 0)
-
-        if prev_offset >= 0:
-            return PageRequest(offset=max(0, prev_offset),
+        if self.has_previous:
+            return PageRequest(offset=max(0, self.request.offset - (self.request.limit or self.count)),
                                limit=self.request.limit,
                                filter=self.request.filter)
         return None
@@ -76,10 +89,10 @@ class PageResponse(BaseModel, Generic[_DocType]):
     count: int | None = None
     next: PageRequest | None = None
     previous: PageRequest | None = None
-    _base_url: str | None = Field(None, alias='base_url', exclude=True)
+    base_url: str | None = Field(None, exclude=True)
 
     @root_validator()
-    def validate_count(cls, values: dict) -> int:
+    def validate_count(cls, values: dict) -> dict:
         results: list = values['results']
         count: int = values['count']
 
@@ -87,19 +100,23 @@ class PageResponse(BaseModel, Generic[_DocType]):
             values['count'] = len(results)
         return values
 
-    def json(self, *args, **kwargs):
-        # TODO: why is this not working?
-        kwargs['encoder'] = self._encoder
-        return super().json(*args, **kwargs)
+    @root_validator()
+    def hack_base_url(cls, values: dict) -> dict:
+        if values['next']:
+            setattr(values['next'], 'base_url_', values['base_url'])
 
-    def _encoder(self, obj: Any) -> Any:
-        if isinstance(obj, PageRequest):
-            return obj.generate_url(self._base_url)
-        return str(obj)
+        if values['previous']:
+            setattr(values['previous'], 'base_url_', values['base_url'])
+
+        return values
 
     class Config:
         allow_population_by_field_name = True
         underscore_attrs_are_private = True
+        json_encoders = {
+            ObjectId: str,
+            PageRequest: lambda obj: obj.generate_url(obj.base_url_)
+        }
 
 
 class Paginatable(Protocol, Generic[_DocType]):

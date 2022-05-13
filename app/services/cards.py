@@ -33,7 +33,7 @@ async def get_own_cards(user: models.User, page_request: models.PageRequest) -> 
     return models.Page(
         request=page_request,
         results=results,
-        items_left=own_cards_count - len(results)
+        total_items=own_cards_count
     )
 
 
