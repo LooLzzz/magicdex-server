@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from motor import core as motor_core
 from motor import motor_asyncio
 
-from .models import Card, User
+from . import models
 
 # dotenv
 dotenv.load_dotenv()
@@ -20,8 +20,8 @@ mongodb_client: motor_core.AgnosticClient = motor_asyncio.AsyncIOMotorClient(
     tls=True,
     tlsAllowInvalidCertificates=True
 )
-users_collection: motor_core.Collection['User'] = mongodb_client['magicdex-db']['users']
-cards_collection: motor_core.Collection['Card'] = mongodb_client['magicdex-db']['cards']
+users_collection: motor_core.Collection[models.User] = mongodb_client['magicdex-db']['users']
+cards_collection: motor_core.Collection[models.Card] = mongodb_client['magicdex-db']['cards']
 
 # start `main.py` !important
 from . import main

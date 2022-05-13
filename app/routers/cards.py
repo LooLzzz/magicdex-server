@@ -1,13 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from .. import models, services
 
 router = APIRouter()
 
 
-@router.get('/me', response_model=list[models.Card])
-async def get_own_cards(current_user: models.User = Depends(services.get_current_user)):
-    return await services.get_own_cards(current_user)
+@router.get('/me')
+async def get_own_cards(request: Request,
+                        pagination: models.Pagination[models.Card] = Depends(services.parse_pagination),
+                        current_user: models.User = Depends(services.get_current_user)):
+    pagination = await pagination.paginate(
+        endpoint_url=request.url_for('get_own_cards'),
+        func=services.get_own_cards,
+        user=current_user
+    )
+    return pagination.response
 
 
 @router.get('/me/{card_id}', response_model=models.Card)
