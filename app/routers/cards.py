@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from .. import pagination as pg
 from .. import services
@@ -8,19 +8,15 @@ router = APIRouter()
 
 
 @router.get('/me', response_model=pg.generate_response_schema(Card))
-async def get_own_cards(request: Request,
-                        current_user: User = Depends(services.get_current_user),
+async def get_own_cards(current_user: User = Depends(services.get_current_user),
                         pagination: pg.Pagination[Card] = Depends(
-                            pg.get_pagination_parser(offset_kwargs={'default': 0},
-                                                     limit_kwargs={'default': 250},
-                                                     filter_kwargs={'example': '{"name": "fireball"}'})
-                        )):
-    pagination = await pagination.paginate(
-        endpoint_url=request.url_for('get_own_cards'),
+                            pg.get_pagination_dependency(offset_kwargs={'default': 0},
+                                                         limit_kwargs={'default': 250},
+                                                         filter_kwargs={'example': '{"name": "fireball"}'}))):
+    return await pagination.paginate(
         func=services.get_own_cards,
         user=current_user
     )
-    return pagination.response
 
 
 @router.get('/me/{card_id}', response_model=Card)

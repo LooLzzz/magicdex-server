@@ -1,6 +1,6 @@
 import inspect
 import json
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Generic, Protocol, TypedDict, TypeVar
 from urllib.parse import urlencode
 
 from fastapi import HTTPException, Response, status
@@ -10,11 +10,18 @@ from ..utils import filter_dict_values
 
 _DocType = TypeVar('_DocType', bound=BaseModel)
 
+_paginatable_dict_types = {
+    'results': list,
+    'total_items': int
+}
+_paginatable_dict_keys = set(_paginatable_dict_types.keys())
+PaginatableDict = TypedDict('PaginatableDict', _paginatable_dict_types)  # type: ignore
 
-class Paginatable(Protocol, Generic[_DocType]):
-    def __call__(self, *args,
+
+class Paginatable(Protocol):
+    def __call__(self, *,
                  page_request: 'PageRequest',
-                 **kwargs) -> 'Page[_DocType]': ...
+                 **kwargs) -> PaginatableDict: ...
 
 
 class PageRequest(BaseModel):
@@ -45,9 +52,6 @@ class PageRequest(BaseModel):
             })
         )
         return f'{base_url}?{params}'
-
-    def dict(self, *args, **kwargs):
-        return self  # required for hacky fix
 
 
 class Page(BaseModel, Generic[_DocType]):
@@ -87,6 +91,9 @@ class Page(BaseModel, Generic[_DocType]):
                                filter=self.request.filter)
         return None
 
+    class Config:
+        extra = 'ignore'
+
 
 class PageResponse(Response, Generic[_DocType]):
     def __init__(self, results: list[_DocType] | None = None,
@@ -121,29 +128,40 @@ class PageResponse(Response, Generic[_DocType]):
 
 class Pagination(BaseModel, Generic[_DocType]):
     request: PageRequest
-    _endpoint_url: str | None = None
+    base_url: str
     _page: Page[_DocType] | None = None
 
-    async def paginate(self, endpoint_url: str,
-                       func: Paginatable[_DocType],
-                       *args, **kwargs) -> 'Pagination[_DocType]':
+    async def paginate(self,
+                       func: Paginatable,
+                       **kwargs) -> 'PageResponse[_DocType]':
         """
         Paginate a function call.
-        Any additional arguments are passed to the function.
-        :param endpoint_url: The endpoint URL to use for the pagination links
-        :param func: The function to paginate, should accept a `page_request: PageRequest` kwarg and return a `pagination.Page` or its values as a `dict`
+        :param func: The service function to paginate, should accept a `page_request: PageRequest` keyword argument and return a dict with `{'results': [...], 'total_items': ...}`
+        :param kwargs: Additional keyword arguments are passed to the service function.
         """
-        self._endpoint_url = endpoint_url
-
         try:
             if inspect.iscoroutinefunction(func):
-                self._page = Page.parse_obj(
-                    await func(*args, **kwargs, page_request=self.request)
-                )
+                res: PaginatableDict = await func(**kwargs, page_request=self.request)
             else:
-                self._page = Page.parse_obj(
-                    func(*args, **kwargs, page_request=self.request)
+                res = func(**kwargs, page_request=self.request)
+
+            if not isinstance(res, dict):
+                raise TypeError(
+                    f'{func.__name__!r} returned {res.__class__.__name__!r}, '
+                    f'expected dict with keys: {_paginatable_dict_keys}'
                 )
+
+            res_keys = set(res.keys())
+            if not _paginatable_dict_keys.issubset(res_keys):
+                raise TypeError(
+                    f"{func.__name__!r} returned 'dict' with keys: {res_keys}, "
+                    f'expected keys: {_paginatable_dict_keys}'
+                )
+
+            self._page = Page.parse_obj({
+                **res,
+                'request': self.request
+            })
 
         except HTTPException as e:
             raise e
@@ -151,15 +169,15 @@ class Pagination(BaseModel, Generic[_DocType]):
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f'Error while paginating: {e!r}',
+                detail=f'Error while paginating: {e}',
                 headers={'WWW-Authenticate': 'Bearer'}
             )
-        return self
+        return self.response
 
     @property
     def response(self) -> PageResponse[_DocType]:
         return PageResponse(
-            base_url=self._endpoint_url,
+            base_url=self.base_url,
             next=self._page.next,
             previous=self._page.previous,
             results=self._page.results,

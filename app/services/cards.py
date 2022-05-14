@@ -3,10 +3,10 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
+from .. import pagination as pg
 from ..common import cards_collection
 from ..exceptions import NoneTypeError
 from ..models import Card, PyObjectId, User
-from ..pagination import Page, PageRequest
 from . import users as users_service
 from .utils import compile_case_sensitive_dict
 
@@ -22,7 +22,7 @@ async def get_own_cards_count(user: User, filter: dict[str, Any] = None) -> int:
     })
 
 
-async def get_own_cards(user: User, page_request: PageRequest) -> Page[Card]:
+async def get_own_cards(user: User, page_request: pg.PageRequest) -> pg.PaginatableDict:
     for k in page_request.filter:
         if k not in Card.__alias_fields__:
             raise HTTPException(
@@ -46,11 +46,10 @@ async def get_own_cards(user: User, page_request: PageRequest) -> Page[Card]:
         get_own_cards_count(user, filter=page_request.filter)
     )
 
-    return Page(
-        request=page_request,
-        results=results,
-        total_items=own_cards_count
-    )
+    return {
+        'results': results,
+        'total_items': own_cards_count
+    }
 
 
 async def get_card_by_id(card_id: PyObjectId) -> Card:

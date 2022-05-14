@@ -8,21 +8,21 @@ from ..utils import filter_dict_values
 from .models import Pagination
 
 _FieldT = TypeVar('_FieldT')
-_FilterDictT = TypedDict('_FilterDictT', {
+_FilterFieldDictT = TypedDict('_FilterFieldDictT', {
     'default': _FieldT | None,
     'example': _FieldT | None,
     'description': str | None
 })
-_IntDictT = TypedDict('_IntDictT', {
+_IntFieldDictT = TypedDict('_IntFieldDictT', {
     'default': int | None,
     'example': int | None,
     'description': str | None
 })
 
 
-def get_pagination_parser(offset_kwargs: _IntDictT | None = None,
-                          limit_kwargs: _IntDictT | None = None,
-                          filter_kwargs: _FilterDictT | None = None):
+def get_pagination_dependency(offset_kwargs: _IntFieldDictT | None = None,
+                              limit_kwargs: _IntFieldDictT | None = None,
+                              filter_kwargs: _FilterFieldDictT | None = None):
     _offset_kwargs = {
         'default': 0,
         'ge': 0
@@ -59,6 +59,7 @@ def get_pagination_parser(offset_kwargs: _IntDictT | None = None,
 
     async def _parse_pagination_request(request: Request,
                                         page_request: PageRequestSchema = Depends()) -> Pagination:
+        base_url = str(request.url).split('?')[0]
         extra_params = {k: v
                         for k, v in request.query_params.items()
                         if k not in ('offset', 'limit')}
@@ -66,10 +67,11 @@ def get_pagination_parser(offset_kwargs: _IntDictT | None = None,
             try:
                 extra_params[k] = json.loads(v)
             except json.JSONDecodeError:
-                pass
+                pass  # do nothing
 
         return Pagination(
             # filter `None` values
+            base_url=base_url,
             request=filter_dict_values({
                 **extra_params,
                 **page_request.dict(),
