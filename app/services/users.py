@@ -9,6 +9,7 @@ from jose import jwt
 
 from .. import users_collection
 from ..models import PyObjectId, Token, User
+from .utils import compile_case_sensitive
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALGORITHM = 'HS256'
@@ -22,7 +23,8 @@ async def get_user(*, id: PyObjectId | None = None,
         return None
 
     try:
-        username = username and re.compile(fr'^{re.escape(username)}$', re.IGNORECASE)
+        username = username and compile_case_sensitive(username,
+                                                       match_whole_word=True)
         user = User.parse_obj(
             await users_collection.find_one(
                 dict(filter(

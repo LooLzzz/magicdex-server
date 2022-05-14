@@ -26,3 +26,11 @@ class Card(MongoBaseModel):
         return [cls.parse_obj(card_data)
                 async for card_data in cursor
                 if card_data]
+
+    @classmethod
+    @property
+    def __alias_fields__(cls) -> list[str]:
+        res = []
+        for field in cls.__fields__.values():
+            res.append(field.alias)
+        return res

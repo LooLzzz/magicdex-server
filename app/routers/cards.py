@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
+from .. import pagination as pg
 from .. import services
 from ..models import Card, User
-from ..pagination import Pagination, get_pagination_parser
 
 router = APIRouter()
 
 
-@router.get('/me')
+@router.get('/me', response_model=pg.generate_response_schema(Card))
 async def get_own_cards(request: Request,
                         current_user: User = Depends(services.get_current_user),
-                        pagination: Pagination[Card] = Depends(get_pagination_parser(offset_default=0,
-                                                                                     limit_default=None,
-                                                                                     filter_kwargs={'example': '{"name": "fireball"}'}))):
+                        pagination: pg.Pagination[Card] = Depends(
+                            pg.get_pagination_parser(offset_kwargs={'default': 0},
+                                                     limit_kwargs={'default': 250},
+                                                     filter_kwargs={'example': '{"name": "fireball"}'})
+                        )):
     pagination = await pagination.paginate(
         endpoint_url=request.url_for('get_own_cards'),
         func=services.get_own_cards,
@@ -56,4 +58,16 @@ async def create_own_cards(current_user: User = Depends(services.get_current_use
 @router.put('/me/{card_id}', response_model=Card)
 async def create_own_card(card: Card = Depends(services.get_card_by_id)):
     # TODO: create own card
+    pass
+
+
+@router.delete('/me', response_model=list[Card])
+async def delete_own_cards(current_user: User = Depends(services.get_current_user)):
+    # TODO: delete own cards
+    pass
+
+
+@router.delete('/me/{card_id}', response_model=Card)
+async def delete_own_card(card: Card = Depends(services.get_card_by_id)):
+    # TODO: delete own card
     pass

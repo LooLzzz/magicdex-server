@@ -1,19 +1,24 @@
 import inspect
+import json
 from typing import Any, Generic, Protocol, TypeVar
 from urllib.parse import urlencode
 
-from bson import ObjectId
-from fastapi import HTTPException, status
-from pydantic import BaseModel, Field, root_validator, validator
+from fastapi import HTTPException, Response, status
+from pydantic import BaseModel, Field, root_validator
 
 _DocType = TypeVar('_DocType', bound=BaseModel)
+
+
+class Paginatable(Protocol, Generic[_DocType]):
+    def __call__(self, *args,
+                 page_request: 'PageRequest',
+                 **kwargs) -> 'Page[_DocType]': ...
 
 
 class PageRequest(BaseModel):
     offset: int = Field(0, ge=0)
     limit: int | None = Field(None, ge=1)
     filter: dict[str, Any] = Field(default_factory=dict)
-    base_url_: str | None = Field(None, exclude=True)  # required for hacky fix
 
     @root_validator(pre=True)
     def build_filter_dict(cls, values: dict[str, Any]) -> dict[str, Any]:
@@ -84,45 +89,35 @@ class Page(BaseModel, Generic[_DocType]):
         return None
 
 
-class PageResponse(BaseModel, Generic[_DocType]):
-    results: list[_DocType] = Field(default_factory=list)
-    count: int | None = None
-    next: PageRequest | None = None
-    previous: PageRequest | None = None
-    base_url: str | None = Field(None, exclude=True)
+class PageResponse(Response, Generic[_DocType]):
+    def __init__(self, results: list[_DocType] | None = None,
+                 count: int | None = None,
+                 next: PageRequest | None = None,
+                 previous: PageRequest | None = None,
+                 base_url: str | None = None):
+        self._base_url = base_url
+        self._content = {'count': count or len(results),
+                         'next': next,
+                         'previous': previous,
+                         'results': results},
 
-    @root_validator()
-    def validate_count(cls, values: dict) -> dict:
-        results: list = values['results']
-        count: int = values['count']
+        super().__init__(content=self.json(),
+                         media_type='application/json')
 
-        if count is None:
-            values['count'] = len(results)
-        return values
+    def json(self, *, sort_keys: bool = False, **kwargs) -> str:
+        def encoder(obj):
+            if isinstance(obj, PageRequest):
+                return obj.generate_url(self._base_url)
+            if isinstance(obj, BaseModel):
+                return obj.dict()
+            return str(obj)
 
-    @root_validator()
-    def hack_base_url(cls, values: dict) -> dict:
-        if values['next']:
-            setattr(values['next'], 'base_url_', values['base_url'])
-
-        if values['previous']:
-            setattr(values['previous'], 'base_url_', values['base_url'])
-
-        return values
-
-    class Config:
-        allow_population_by_field_name = True
-        underscore_attrs_are_private = True
-        json_encoders = {
-            ObjectId: str,
-            PageRequest: lambda obj: obj.generate_url(obj.base_url_)
-        }
-
-
-class Paginatable(Protocol, Generic[_DocType]):
-    def __acall__(self, *args,
-                  page: 'PageRequest',
-                  **kwargs) -> Page[_DocType]: ...
+        return json.dumps(
+            self._content,
+            **kwargs,
+            sort_keys=sort_keys,
+            default=encoder
+        )
 
 
 class Pagination(BaseModel, Generic[_DocType]):

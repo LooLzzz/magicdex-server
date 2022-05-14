@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 from fastapi import HTTPException, status
 
@@ -7,21 +8,34 @@ from ..models import Card, PyObjectId, User
 from ..pagination import Page, PageRequest
 from . import users as users_service
 from .exceptions import NoneTypeError
+from .utils import compile_case_sensitive_dict
 
 
 async def get_card_owner(card: Card) -> User:
     return await users_service.get_user(card.user_id)
 
 
-async def get_own_cards_count(user: User) -> int:
-    return await cards_collection.count_documents({'user_id': user.id})
+async def get_own_cards_count(user: User, filter: dict[str, Any] = None) -> int:
+    return await cards_collection.count_documents({
+        **(filter or {}),
+        'user_id': user.id
+    })
 
 
 async def get_own_cards(user: User, page_request: PageRequest) -> Page[Card]:
+    for k in page_request.filter:
+        if k not in Card.__alias_fields__:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Invalid filter',
+                headers={'WWW-Authenticate': 'Bearer'}
+            )
+
     cursor = cards_collection \
         .find({
+            **compile_case_sensitive_dict(page_request.filter,
+                                          match_whole_word=False),
             'user_id': user.id,
-            **page_request.filter
         }) \
         .skip(page_request.offset)
     if page_request.limit:
@@ -29,7 +43,7 @@ async def get_own_cards(user: User, page_request: PageRequest) -> Page[Card]:
 
     results, own_cards_count = await asyncio.gather(
         Card.parse_cursor(cursor),
-        get_own_cards_count(user)
+        get_own_cards_count(user, filter=page_request.filter)
     )
 
     return Page(
