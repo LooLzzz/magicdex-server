@@ -1,18 +1,17 @@
 import os
-import re
 from datetime import timedelta
 from typing import TypedDict
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
+from pymongo.results import InsertOneResult
 
-from .. import users_collection
-from ..models import PyObjectId, Token, User
+from ..common import ALGORITHM, SECRET_KEY, users_collection
+from ..models import PyObjectId, Token, User, UserSchema
+from ..utils import filter_dict_values
 from .utils import compile_case_sensitive
 
-SECRET_KEY = os.getenv('SECRET_KEY')
-ALGORITHM = 'HS256'
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 AccessTokenDict = TypedDict('AccessTokenT', {'access_token': str, 'token_type': str})
 
@@ -27,10 +26,10 @@ async def get_user(*, id: PyObjectId | None = None,
                                                        match_whole_word=True)
         user = User.parse_obj(
             await users_collection.find_one(
-                dict(filter(
-                    lambda v: v[1] is not None,
-                    {'_id': id, 'username': username}.items()
-                ))
+                filter_dict_values({
+                    '_id': id,
+                    'username': username
+                })
             )
         )
 
@@ -82,6 +81,30 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     return user
 
 
-async def create_user(user: User) -> User:
-    # TODO: create user
-    pass
+async def insert_user_to_db(user: User) -> User:
+    try:
+        insert_result: InsertOneResult = await users_collection.insert_one(
+            user.dict(by_alias=True)
+        )
+
+        user.id = insert_result.inserted_id
+        return user
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f'Error while inserting new user {e!r}'
+        )
+
+
+async def create_user(form_data: UserSchema) -> User:
+    if await get_user(username=form_data.username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail='User already exists'
+        )
+
+    return await insert_user_to_db(
+        User(username=form_data.username,
+             hashed_password=form_data.generate_password_hash())
+    )

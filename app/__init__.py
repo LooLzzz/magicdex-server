@@ -1,27 +1,14 @@
-import os
-
 import dotenv
 from fastapi import FastAPI
-from motor import core as motor_core
-from motor import motor_asyncio
-
-from . import models
 
 # dotenv
 dotenv.load_dotenv()
-MONGODB_URL = os.getenv('MONGODB_URL')
 
 # fastapi
 app = FastAPI()
 
-# monogdb
-mongodb_client: motor_core.AgnosticClient = motor_asyncio.AsyncIOMotorClient(
-    MONGODB_URL,
-    tls=True,
-    tlsAllowInvalidCertificates=True
-)
-users_collection: motor_core.Collection[models.User] = mongodb_client['magicdex-db']['users']
-cards_collection: motor_core.Collection[models.Card] = mongodb_client['magicdex-db']['cards']
+# initialize all necessary common modules and values
+from .common import *
 
 # start `main.py` !important
 from . import main

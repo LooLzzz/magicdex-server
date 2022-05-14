@@ -6,6 +6,8 @@ from urllib.parse import urlencode
 from fastapi import HTTPException, Response, status
 from pydantic import BaseModel, Field, root_validator
 
+from ..utils import filter_dict_values
+
 _DocType = TypeVar('_DocType', bound=BaseModel)
 
 
@@ -36,14 +38,11 @@ class PageRequest(BaseModel):
 
     def generate_url(self, base_url: str) -> str:
         params = urlencode(
-            dict(filter(
-                lambda v: v[1] is not None,
-                {
-                    'offset': self.offset,
-                    'limit': self.limit,
-                    **self.filter
-                }.items()
-            ))
+            filter_dict_values({
+                'offset': self.offset,
+                'limit': self.limit,
+                **self.filter
+            })
         )
         return f'{base_url}?{params}'
 
@@ -145,6 +144,9 @@ class Pagination(BaseModel, Generic[_DocType]):
                 self._page = Page.parse_obj(
                     func(*args, **kwargs, page_request=self.request)
                 )
+
+        except HTTPException as e:
+            raise e
 
         except Exception as e:
             raise HTTPException(

@@ -1,9 +1,10 @@
 import json
-from typing import Generic, Type, TypedDict, TypeVar
+from typing import Type, TypedDict, TypeVar
 
 from fastapi import Depends, Query, Request
 from pydantic import BaseModel
 
+from ..utils import filter_dict_values
 from .models import Pagination
 
 _FieldT = TypeVar('_FieldT')
@@ -68,13 +69,11 @@ def get_pagination_parser(offset_kwargs: _IntDictT | None = None,
                 pass
 
         return Pagination(
-            request=dict(filter(  # filter `None` values
-                lambda v: v[1] is not None,
-                {
-                    **extra_params,
-                    **page_request.dict(),
-                }.items()
-            ))
+            # filter `None` values
+            request=filter_dict_values({
+                **extra_params,
+                **page_request.dict(),
+            })
         )
 
     return _parse_pagination_request

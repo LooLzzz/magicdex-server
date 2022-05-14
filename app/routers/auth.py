@@ -1,13 +1,11 @@
-from datetime import timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from .. import services
-from ..models import TokenResponse, User
+from ..common import ACCESS_TOKEN_EXPIRE
+from ..models import TokenResponse, UserSchema
 
 router = APIRouter()
-ACCESS_TOKEN_EXPIRE = timedelta(weeks=4)
 
 
 oauth2_schema = OAuth2PasswordBearer(
@@ -41,10 +39,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @router.put('', response_model=TokenResponse)
 @router.put('/register', response_model=TokenResponse, include_in_schema=False)
-async def register(form_data: User):
-    user = await services.create_user(form_data)
+async def register(form_data: UserSchema = Depends()):
+    user = services.create_user(form_data)
 
     return await services.create_access_token(
-        user=user,
+        user=await user,
         expires_delta=ACCESS_TOKEN_EXPIRE
     )

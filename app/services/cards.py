@@ -3,11 +3,11 @@ from typing import Any
 
 from fastapi import HTTPException, status
 
-from .. import cards_collection
+from ..common import cards_collection
+from ..exceptions import NoneTypeError
 from ..models import Card, PyObjectId, User
 from ..pagination import Page, PageRequest
 from . import users as users_service
-from .exceptions import NoneTypeError
 from .utils import compile_case_sensitive_dict
 
 
@@ -27,7 +27,7 @@ async def get_own_cards(user: User, page_request: PageRequest) -> Page[Card]:
         if k not in Card.__alias_fields__:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail='Invalid filter',
+                detail=f'Filter field ({k!r}) not in Card model',
                 headers={'WWW-Authenticate': 'Bearer'}
             )
 
