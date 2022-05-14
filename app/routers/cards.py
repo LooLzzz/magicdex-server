@@ -2,15 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from .. import services
 from ..models import Card, User
-from ..pagination import Pagination, parse_pagination_request
+from ..pagination import Pagination, get_pagination_parser
 
 router = APIRouter()
 
 
 @router.get('/me')
 async def get_own_cards(request: Request,
-                        pagination: Pagination[Card] = Depends(parse_pagination_request),
-                        current_user: User = Depends(services.get_current_user)):
+                        current_user: User = Depends(services.get_current_user),
+                        pagination: Pagination[Card] = Depends(get_pagination_parser(offset_default=0,
+                                                                                     limit_default=None,
+                                                                                     filter_kwargs={'example': '{"name": "fireball"}'}))):
     pagination = await pagination.paginate(
         endpoint_url=request.url_for('get_own_cards'),
         func=services.get_own_cards,
