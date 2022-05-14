@@ -3,9 +3,9 @@ from fastapi.responses import RedirectResponse
 
 from . import app, routers
 
-app.include_router(routers.auth_router, prefix='/auth', tags=['auth'])
-app.include_router(routers.cards_router, prefix='/cards', tags=['cards'])
-app.include_router(routers.users_router, prefix='/users', tags=['users'])
+app.include_router(routers.auth_router, prefix='/auth', tags=['Auth'])
+app.include_router(routers.cards_router, prefix='/cards', tags=['Cards'])
+app.include_router(routers.users_router, prefix='/users', tags=['Users'])
 
 
 @app.get('/', include_in_schema=False)

@@ -16,7 +16,10 @@ oauth2_schema = OAuth2PasswordBearer(
 )
 
 
-@router.post('/login', response_model=TokenResponse)
+@router.post('', response_model=TokenResponse)
+@router.get('', response_model=TokenResponse, include_in_schema=False)
+@router.post('/login', response_model=TokenResponse, include_in_schema=False)
+@router.get('/login', response_model=TokenResponse, include_in_schema=False)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = await services.authenticate_user(
         username=form_data.username,
@@ -36,7 +39,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     )
 
 
-@router.put('/register', response_model=TokenResponse)
+@router.put('', response_model=TokenResponse)
+@router.put('/register', response_model=TokenResponse, include_in_schema=False)
 async def register(form_data: User):
     user = await services.create_user(form_data)
 
