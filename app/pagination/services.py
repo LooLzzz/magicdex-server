@@ -23,38 +23,37 @@ _IntFieldDictT = TypedDict('_IntFieldDictT', {
 def get_pagination_dependency(offset_kwargs: _IntFieldDictT | None = None,
                               limit_kwargs: _IntFieldDictT | None = None,
                               filter_kwargs: _FilterFieldDictT | None = None):
-    _offset_kwargs = {
+    offset_kwargs = {
         'default': 0,
-        'ge': 0
+        'ge': 0,
+        **(offset_kwargs or {})
     }
-    _offset_kwargs.update(offset_kwargs or {})
 
-    _limit_kwargs = {
+    limit_kwargs = {
         'default': 250,
-        'ge': 1
+        'ge': 1,
+        **(limit_kwargs or {})
     }
-    _limit_kwargs.update(limit_kwargs or {})
 
-    _filter_kwargs = {
+    filter_kwargs = {
         'default': None,
-        'description': 'Represents values passed to the query as kwargs'
+        'description': 'Represents values passed to the query as kwargs',
+        **(filter_kwargs or {})
     }
-    _filter_kwargs.update(filter_kwargs or {})
 
     class PageRequestSchema:
         def __init__(self,
-                     offset: int = Query(**_offset_kwargs),
-                     limit: int | None = Query(**_limit_kwargs),
-                     filter: str | None = Query(**_filter_kwargs)):
+                     offset: int = Query(**offset_kwargs),
+                     limit: int | None = Query(**limit_kwargs),
+                     filter: str | None = Query(**filter_kwargs)):
             self.offset = offset
             self.limit = limit
-            self.filter = filter
+            # ignore filter, it will be handled by 'pg.Pagination'
 
         def dict(self):
             return {
                 'offset': self.offset,
                 'limit': self.limit,
-                # **(self.filter or {})
             }
 
     async def _parse_pagination_request(request: Request,

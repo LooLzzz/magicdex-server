@@ -1,4 +1,5 @@
 from typing import Callable, TypeVar
+from urllib.parse import urlencode
 
 _KeyType = TypeVar('_KeyType')
 _ValueType = TypeVar('_ValueType')
@@ -15,3 +16,17 @@ def filter_dict_values(d: dict[_KeyType, _ValueType],
     return {k: v
             for k, v in d.items()
             if filter_func(v)}
+
+
+def url_encoder(value) -> str:
+    if isinstance(value, dict):
+        return urlencode([
+            (k, url_encoder(v)) for k, v
+            in filter_dict_values(value).items()
+        ])
+
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, list | tuple):
+        return repr(value).replace("'", '"')
+    return value

@@ -10,7 +10,7 @@ from pymongo.results import InsertOneResult
 from ..common import ALGORITHM, SECRET_KEY, users_collection
 from ..models import PyObjectId, Token, User, UserSchema
 from ..utils import filter_dict_values
-from .utils import compile_case_sensitive
+from .utils import compile_case_sensitive_str
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 AccessTokenDict = TypedDict('AccessTokenT', {'access_token': str, 'token_type': str})
@@ -22,7 +22,7 @@ async def get_user(*, id: PyObjectId | None = None,
         return None
 
     try:
-        username = username and compile_case_sensitive(username,
+        username = username and compile_case_sensitive_str(username,
                                                        match_whole_word=True)
         user = User.parse_obj(
             await users_collection.find_one(

@@ -1,12 +1,11 @@
 import inspect
 import json
 from typing import Any, Generic, Protocol, TypedDict, TypeVar
-from urllib.parse import urlencode
 
 from fastapi import HTTPException, Response, status
 from pydantic import BaseModel, Field, root_validator
 
-from ..utils import filter_dict_values
+from ..utils import filter_dict_values, url_encoder
 
 _DocType = TypeVar('_DocType', bound=BaseModel)
 
@@ -44,13 +43,11 @@ class PageRequest(BaseModel):
         return values
 
     def generate_url(self, base_url: str) -> str:
-        params = urlencode(
-            filter_dict_values({
-                'offset': self.offset,
-                'limit': self.limit,
-                **self.filter
-            })
-        )
+        params = url_encoder({
+            'offset': self.offset,
+            'limit': self.limit,
+            **self.filter
+        })
         return f'{base_url}?{params}'
 
 
