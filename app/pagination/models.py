@@ -5,7 +5,7 @@ from typing import Any, Generic, Protocol, TypedDict, TypeVar
 from fastapi import HTTPException, Response, status
 from pydantic import BaseModel, Field, root_validator
 
-from ..utils import filter_dict_values, url_encoder
+from ..utils import url_encoder
 
 _DocType = TypeVar('_DocType', bound=BaseModel)
 

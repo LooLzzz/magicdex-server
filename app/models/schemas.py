@@ -1,9 +1,8 @@
-from pydantic import BaseModel
-
 from ..common import crypt_context
+from .utils import CustomBaseModel
 
 
-class UserSchema(BaseModel):
+class UserSchema(CustomBaseModel):
     username: str
     password: str
     public: bool = False

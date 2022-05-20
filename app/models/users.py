@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, validator
+from pydantic import Field, validator
 
 from ..common import crypt_context
-from .utils import MongoBaseModel, PyObjectId
+from .utils import CustomBaseModel, MongoModel, PyObjectId
 
 
-class Token(BaseModel):
+class Token(CustomBaseModel):
     subject: PyObjectId = Field(alias='sub')
     expires_at: timedelta | datetime = Field(alias='exp')
     issued_at: datetime = Field(default_factory=datetime.utcnow, alias='iat')
@@ -28,20 +28,18 @@ class Token(BaseModel):
         res = self.dict(by_alias=True)
         res.update({
             'sub': str(res['sub']),
+            'sub': str(res['sub']),
             'jti': str(res['jti'])
         })
         return res
 
-    class Config:
-        allow_population_by_field_name = True
 
-
-class TokenResponse(BaseModel):
+class TokenResponse(CustomBaseModel):
     access_token: str
     token_type: str
 
 
-class User(MongoBaseModel):
+class User(MongoModel):
     username: str
     hashed_password: str = Field(alias='password')
     public: bool = False
@@ -49,4 +47,3 @@ class User(MongoBaseModel):
 
     def verify_password(self, password: str) -> bool:
         return crypt_context.verify(password, self.hashed_password)
-

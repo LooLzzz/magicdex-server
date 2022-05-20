@@ -1,10 +1,10 @@
-import os
 from datetime import timedelta
 from typing import TypedDict
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
+from motor import core as motor_core
 from pymongo.results import InsertOneResult
 
 from ..common import ALGORITHM, SECRET_KEY, users_collection
@@ -12,6 +12,7 @@ from ..models import PyObjectId, Token, User, UserSchema
 from ..utils import filter_dict_values
 from .utils import compile_case_sensitive_str
 
+users_collection: motor_core.Collection[User]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 AccessTokenDict = TypedDict('AccessTokenT', {'access_token': str, 'token_type': str})
 
@@ -23,7 +24,7 @@ async def get_user(*, id: PyObjectId | None = None,
 
     try:
         username = username and compile_case_sensitive_str(username,
-                                                       match_whole_word=True)
+                                                           match_whole_word=True)
         user = User.parse_obj(
             await users_collection.find_one(
                 filter_dict_values({
