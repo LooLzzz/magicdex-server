@@ -32,8 +32,11 @@ class CustomBaseModel(BaseModel):
         return [field.alias for field in cls.__fields__.values()]
 
     def is_empty(self) -> bool:
-        return not any(
-            self.dict(exclude_none=True)
+        return bool(
+            self.dict(
+                exclude_none=True,
+                exclude={'id'}
+            )
         )
 
     class Config:

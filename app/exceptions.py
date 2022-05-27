@@ -7,12 +7,14 @@ class NoneTypeError(TypeError):
 
 class HTTPForbiddenError(HTTPException):
     def __init__(self,
-                 detail='You are not allowed to access this resource',
-                 status_code=status.HTTP_403_FORBIDDEN,
-                 headers={'WWW-Authenticate': 'Bearer'},
+                 detail: str = 'You are not allowed to access this resource',
+                 detail_prefix: str | None = None,
+                 status_code: int = status.HTTP_403_FORBIDDEN,
+                 headers: dict = {'WWW-Authenticate': 'Bearer'},
                  *args, **kwargs):
+        detail_prefix = f'{detail_prefix.rstrip()} ' if detail_prefix else ''
         super().__init__(
-            detail=detail,
+            detail=f'{detail_prefix}{detail}',
             status_code=status_code,
             headers=headers,
             *args, **kwargs
@@ -21,11 +23,13 @@ class HTTPForbiddenError(HTTPException):
 
 class HTTPNotFoundError(HTTPException):
     def __init__(self,
-                 detail='Resource not found',
-                 status_code=status.HTTP_404_NOT_FOUND,
+                 detail: str = 'Resource not found',
+                 detail_prefix: str | None = None,
+                 status_code: int = status.HTTP_404_NOT_FOUND,
                  *args, **kwargs):
+        detail_prefix = f'{detail_prefix.rstrip()} ' if detail_prefix else ''
         super().__init__(
-            detail=detail,
+            detail=f'{detail_prefix}{detail}',
             status_code=status_code,
             *args, **kwargs
         )
@@ -33,11 +37,13 @@ class HTTPNotFoundError(HTTPException):
 
 class HTTPBadRequest(HTTPException):
     def __init__(self,
-                 detail='Request is empty',
-                 status_code=status.HTTP_400_BAD_REQUEST,
+                 detail: str,
+                 detail_prefix: str | None = None,
+                 status_code: int = status.HTTP_400_BAD_REQUEST,
                  *args, **kwargs):
+        detail_prefix = f'{detail_prefix.rstrip()} ' if detail_prefix else ''
         super().__init__(
-            detail=detail,
+            detail=f'{detail_prefix}{detail}',
             status_code=status_code,
             *args, **kwargs
         )

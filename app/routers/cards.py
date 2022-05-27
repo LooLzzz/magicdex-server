@@ -1,4 +1,5 @@
 import asyncio
+from sys import prefix
 
 from fastapi import APIRouter, Body, Depends
 
@@ -14,8 +15,7 @@ router = APIRouter()
 @router.get('/me/{card_id}', response_model=Card)
 async def get_own_card(current_user: User = Depends(services.get_current_user),
                        card: Card = Depends(services.get_card_by_id, use_cache=False)):
-    if card.user_id != current_user.id:
-        raise HTTPForbiddenError
+    services.allowed_to_view_card(current_user, card, raise_403_forbidden=True)
     return card
 
 
@@ -24,7 +24,7 @@ async def get_own_cards(current_user: User = Depends(services.get_current_user),
                         pagination: pg.Pagination[Card] = Depends(
                             pg.get_pagination_dependency(offset_kwargs={'default': 0},
                                                          limit_kwargs={'default': 250},
-                                                         filter_kwargs={'example': '{"name": "fireball"}'}))):
+                                                         filter_kwargs={'example': '{"amount": 60}'}))):
     return await pagination.paginate(
         func=services.get_own_cards,
         user=current_user
@@ -55,36 +55,51 @@ async def update_own_card(card: Card = Depends(services.get_card_by_id, use_cach
     )
 
 
-@router.post('/me', response_model=list[Card])
+@router.post('/me', response_model=CardUpdateResponse)
 async def update_own_cards(current_user: User = Depends(services.get_current_user),
                            card_requests: list[CardRequest] = Body(None)):
     # authentication #
     for i, card_req in enumerate(card_requests):
         if not card_req.is_empty():
             raise HTTPBadRequest(
-                detail=f'Card[{i}]: Request is empty',
+                detail_prefix=f'Card[{i}]:',
+                detail='Request is empty',
                 headers={'WWW-Authenticate': 'Bearer'}
             )
         if not card_req.id:
             raise HTTPBadRequest(
-                detail=f"Card[{i}]: Field 'id' is missing",
+                detail_prefix=f'Card[{i}]:',
+                detail=f"Field 'id' is missing",
                 headers={'WWW-Authenticate': 'Bearer'}
             )
 
-    cards = await asyncio.gather(
-        *[services.get_card_by_id(card_req.id)
-          for card_req in card_requests]
-    )
+    cards = await asyncio.gather(*[
+        services.get_card_by_id(card_req.id)
+        for card_req in card_requests
+    ])
 
     for i, card in enumerate(cards):
         if card.user_id != current_user.id:
             raise HTTPForbiddenError(
-                detail=f'Card[{i}]: You are not allowed to access this resource',
+                detail_prefix=f'Card[{i}]:',
             )
     # authentication #
 
-    # TODO: update own cards
-    return card_requests
+    update_results: list[CardUpdateResponse] = await asyncio.gather(*[
+        services.update_card(
+            card.update(
+                **req.dict(
+                    exclude_none=True
+                )
+            )
+        )
+        for card, req in zip(cards, card_requests)
+    ])
+
+    # merge all update results into one
+    res = update_results.pop()
+    res.extend(responses=update_results)
+    return res
 
 
 # @router.put('/me/{card_id}', response_model=Card)

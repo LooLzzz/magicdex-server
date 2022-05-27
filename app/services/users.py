@@ -8,13 +8,25 @@ from motor import core as motor_core
 from pymongo.results import InsertOneResult
 
 from ..common import ALGORITHM, SECRET_KEY, users_collection
-from ..models import PyObjectId, Token, User, UserSchema
+from ..exceptions import HTTPForbiddenError
+from ..models import Card, PyObjectId, Token, User, UserSchema
 from ..utils import filter_dict_values
 from .utils import compile_case_sensitive_str
 
 users_collection: motor_core.Collection[User]
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 AccessTokenDict = TypedDict('AccessTokenT', {'access_token': str, 'token_type': str})
+
+
+async def allowed_to_view_card(user: User, card: Card, raise_403_forbidden=True) -> bool:
+    if (card.is_public
+            or card.user_id == user.id):
+        return True
+
+    if raise_403_forbidden:
+        raise HTTPForbiddenError('You are not allowed to view this card')
+
+    return False
 
 
 async def get_user(*, id: PyObjectId | None = None,

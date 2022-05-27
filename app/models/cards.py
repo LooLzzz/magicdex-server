@@ -3,7 +3,6 @@ from typing import Any, Literal, Union, overload
 from uuid import UUID
 
 from pydantic import Field, PositiveInt, validator
-from pymongo.results import DeleteResult, UpdateResult
 
 from .utils import AmountInt, CustomBaseModel, MongoModel, PyObjectId
 
@@ -25,22 +24,9 @@ class Card(MongoModel):
             match kwargs:
                 case {'amount': amount} if AmountInt.is_relative(amount) or aggregate:
                     self.amount += amount
-                case {'amount': amount}:
-                    self.amount = amount
-                case {'tag': tag}:
-                    self.tag = tag
-                case {'foil': foil}:
-                    self.foil = foil
-                case {'condition': condition}:
-                    self.condition = condition
-                case {'signed': signed}:
-                    self.signed = signed
-                case {'altered': altered}:
-                    self.altered = altered
-                case {'misprint': misprint}:
-                    self.misprint = misprint
-                case {'date_created': date_created}:
-                    self.date_created = date_created
+                case {**rest}:
+                    for k, v in rest.items():
+                        setattr(self, k, v)
             return self
 
         else:
@@ -78,6 +64,7 @@ class CardRequest(CustomBaseModel):
     class Config:
         schema_extra = {
             'example': {
+                'id': '62893131e783d76debacbde6',
                 'amount': '+4',
                 'tag': ['zurgo edh', 'turtles'],
                 'foil': True,
@@ -95,6 +82,19 @@ class CardRequestNoId(CardRequest):
     @validator('id', check_fields=False)
     def ignore_id(cls, value):
         return None
+
+    class Config:
+        schema_extra = {
+            'example': {
+                'amount': '+4',
+                'tag': ['zurgo edh', 'turtles'],
+                'foil': True,
+                'condition': 'NM',
+                'signed': False,
+                'altered': False,
+                'misprint': False,
+            }
+        }
 
 
 class CardUpdateResponse(CustomBaseModel):
@@ -116,6 +116,10 @@ class CardUpdateResponse(CustomBaseModel):
         ...
 
     @overload
+    def extend(self, *, responses: list['CardUpdateResponse']) -> 'CardUpdateResponse':
+        ...
+
+    @overload
     def extend(self, *,
                created: list[Card] | None,
                updated: list[Card] | None,
@@ -124,19 +128,28 @@ class CardUpdateResponse(CustomBaseModel):
 
     def extend(self, *,
                response: Union['CardUpdateResponse', None] = None,
+               responses: Union[list['CardUpdateResponse'], None] = None,
                created: list[Card] | None = None,
                updated: list[Card] | None = None,
                deleted: list[Card] | None = None) -> 'CardUpdateResponse':
         if response:
-            self.created.extend(response.created)
-            self.updated.extend(response.updated)
-            self.deleted.extend(response.deleted)
+            if not isinstance(response, CardUpdateResponse):
+                raise TypeError(f'Expected CardUpdateResponse, got {type(response)}')
+            responses = [response]
+
+        if responses:
+            for res in responses:
+                self.created.extend(res.created)
+                self.updated.extend(res.updated)
+                self.deleted.extend(res.deleted)
+
         if created:
             self.created.extend(created)
         if updated:
             self.updated.extend(updated)
         if deleted:
             self.deleted.extend(deleted)
+
         return self
 
     class Config:

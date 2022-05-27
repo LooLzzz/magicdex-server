@@ -3,12 +3,13 @@ from typing import Any
 
 from fastapi import Depends, Path
 from motor import core as motor_core
-from pymongo.results import DeleteResult, UpdateResult
 
 from .. import pagination as pg
 from ..common import cards_collection
-from ..exceptions import HTTPBadRequest, HTTPNotFoundError, NoneTypeError
+from ..exceptions import (HTTPBadRequest, HTTPForbiddenError,
+                          HTTPNotFoundError, NoneTypeError)
 from ..models import Card, CardUpdateResponse, PyObjectId, User
+from .users import allowed_to_view_card
 from .utils import compile_case_sensitive_dict
 
 cards_collection: motor_core.Collection[Card]
@@ -45,6 +46,12 @@ async def get_own_cards(user: User, page_request: pg.PageRequest) -> pg.Paginata
         ),
         get_own_cards_count(user, **filter)
     )
+
+    for i, card in enumerate(results):
+        allowed_to_view_card(user, card, raise_404_not_found=False)
+        raise HTTPForbiddenError(
+            detail_prefix=f'Card[{page_request.offset+i}]'
+        )
 
     return {
         'results': results,
