@@ -106,9 +106,7 @@ async def update_own_cards(current_user: User = Depends(services.get_current_use
     ])
 
     # merge all update results into one
-    res = update_results.pop()
-    res.extend(responses=update_results)
-    return res
+    return CardUpdateResponse.merge(update_results)
 
 
 @router.put('/me', response_model=CardUpdateResponse)
@@ -131,10 +129,18 @@ async def create_own_cards(current_user: User = Depends(services.get_current_use
     ])
     # authentication #
 
-    # TODO: create own cards
-    services.create_cards(current_user, card_requests)
+    create_results: list[CardUpdateResponse] = await asyncio.gather(*[
+        services.create_card(
+            Card(
+                user_id=current_user.id,
+                **req.dict()
+            )
+        )
+        for req in card_requests
+    ])
 
-    pass
+    # merge all create results into one
+    return CardUpdateResponse.merge(create_results)
 
 
 # @router.delete('/me/{card_id}', response_model=Card)

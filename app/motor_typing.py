@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Generic, Iterable, Mapping, Optional, Sequence
+from typing import Any, Generic, Sequence
 
 from pymongo.client_session import ClientSession
 from pymongo.collection import Collection, ReturnDocument
@@ -8,7 +8,7 @@ from pymongo.results import (DeleteResult, InsertManyResult, InsertOneResult,
                              UpdateResult)
 from pymongo.typings import _CollationIn, _DocumentIn, _DocumentType, _Pipeline
 
-_IndexList = Sequence[tuple[str, int | str | Mapping[str, Any]]]
+_IndexList = Sequence[tuple[str, int | str | dict[str, Any]]]
 _IndexKeyHint = str | _IndexList
 
 
@@ -18,78 +18,78 @@ class AsyncCollection(ABC, Collection, Generic[_DocumentType]):
     async def insert_one(self,
                          document: _DocumentIn,
                          bypass_document_validation: bool = False,
-                         session: Optional[ClientSession] = None,
-                         comment: Optional[Any] = None) -> InsertOneResult:
+                         session: ClientSession | None = None,
+                         comment: Any | None = None) -> InsertOneResult:
         ...
 
     async def insert_many(self,
-                          documents: Iterable[_DocumentIn],
+                          documents: list[_DocumentIn],
                           ordered: bool = True,
                           bypass_document_validation: bool = False,
-                          session: Optional[ClientSession] = None,
-                          comment: Optional[Any] = None) -> InsertManyResult:
+                          session: ClientSession | None = None,
+                          comment: Any | None = None) -> InsertManyResult:
         ...
 
     async def replace_one(self,
-                          filter: Mapping[str, Any],
-                          replacement: Mapping[str, Any],
+                          filter: dict[str, Any],
+                          replacement: dict[str, Any],
                           upsert: bool = False,
                           bypass_document_validation: bool = False,
-                          collation: Optional[_CollationIn] = None,
-                          hint: Optional[_IndexKeyHint] = None,
-                          session: Optional[ClientSession] = None,
-                          let: Optional[Mapping[str, Any]] = None,
-                          comment: Optional[Any] = None) -> UpdateResult:
+                          collation: _CollationIn | None = None,
+                          hint: _IndexKeyHint | None = None,
+                          session: ClientSession | None = None,
+                          let: dict[str, Any] | None = None,
+                          comment: Any | None = None) -> UpdateResult:
         ...
 
     async def update_one(self,
-                         filter: Mapping[str, Any],
-                         update: Mapping[str, Any] | _Pipeline,
+                         filter: dict[str, Any],
+                         update: dict[str, Any] | _Pipeline,
                          upsert: bool = False,
                          bypass_document_validation: bool = False,
-                         collation: Optional[_CollationIn] = None,
-                         array_filters: Optional[Sequence[Mapping[str, Any]]] = None,
-                         hint: Optional[_IndexKeyHint] = None,
-                         session: Optional[ClientSession] = None,
-                         let: Optional[Mapping[str, Any]] = None,
-                         comment: Optional[Any] = None) -> UpdateResult:
+                         collation: _CollationIn | None = None,
+                         array_filters: Sequence[dict[str, Any]] | None = None,
+                         hint: _IndexKeyHint | None = None,
+                         session: ClientSession | None = None,
+                         let: dict[str, Any] | None = None,
+                         comment: Any | None = None) -> UpdateResult:
         ...
 
     async def update_many(self,
-                          filter: Mapping[str, Any],
-                          update: Mapping[str, Any] | _Pipeline,
+                          filter: dict[str, Any],
+                          update: dict[str, Any] | _Pipeline,
                           upsert: bool = False,
-                          array_filters: Optional[Sequence[Mapping[str, Any]]] = None,
-                          bypass_document_validation: Optional[bool] = None,
-                          collation: Optional[_CollationIn] = None,
-                          hint: Optional[_IndexKeyHint] = None,
-                          session: Optional[ClientSession] = None,
-                          let: Optional[Mapping[str, Any]] = None,
-                          comment: Optional[Any] = None) -> UpdateResult:
+                          array_filters: Sequence[dict[str, Any]] | None = None,
+                          bypass_document_validation: bool | None = None,
+                          collation: _CollationIn | None = None,
+                          hint: _IndexKeyHint | None = None,
+                          session: ClientSession | None = None,
+                          let: dict[str, Any] | None = None,
+                          comment: Any | None = None) -> UpdateResult:
         ...
 
     async def delete_one(self,
-                         filter: Mapping[str, Any],
-                         collation: Optional[_CollationIn] = None,
-                         hint: Optional[_IndexKeyHint] = None,
-                         session: Optional[ClientSession] = None,
-                         let: Optional[Mapping[str, Any]] = None,
-                         comment: Optional[Any] = None) -> DeleteResult:
+                         filter: dict[str, Any],
+                         collation: _CollationIn | None = None,
+                         hint: _IndexKeyHint | None = None,
+                         session: ClientSession | None = None,
+                         let: dict[str, Any] | None = None,
+                         comment: Any | None = None) -> DeleteResult:
         ...
 
     async def delete_many(self,
-                          filter: Mapping[str, Any],
-                          collation: Optional[_CollationIn] = None,
-                          hint: Optional[_IndexKeyHint] = None,
-                          session: Optional[ClientSession] = None,
-                          let: Optional[Mapping[str, Any]] = None,
-                          comment: Optional[Any] = None) -> DeleteResult:
+                          filter: dict[str, Any],
+                          collation: _CollationIn | None = None,
+                          hint: _IndexKeyHint | None = None,
+                          session: ClientSession | None = None,
+                          let: dict[str, Any] | None = None,
+                          comment: Any | None = None) -> DeleteResult:
         ...
 
     async def find_one(self,
-                       filter: Optional[Any] = None,
+                       filter: Any | None = None,
                        *args: Any,
-                       **kwargs: Any) -> Optional[dict]:
+                       **kwargs: Any) -> dict | None:
         ...
 
     def find(self,
@@ -98,48 +98,48 @@ class AsyncCollection(ABC, Collection, Generic[_DocumentType]):
         ...
 
     async def count_documents(self,
-                              filter: Mapping[str, Any],
-                              session: Optional[ClientSession] = None,
-                              comment: Optional[Any] = None,
+                              filter: dict[str, Any],
+                              session: ClientSession | None = None,
+                              comment: Any | None = None,
                               **kwargs: Any) -> int:
         ...
 
     async def find_one_and_delete(self,
-                                  filter: Mapping[str, Any],
-                                  projection: Optional[Mapping[str, Any] | Iterable[str]] = None,
-                                  sort: Optional[_IndexList] = None,
-                                  hint: Optional[_IndexKeyHint] = None,
-                                  session: Optional[ClientSession] = None,
-                                  let: Optional[Mapping[str, Any]] = None,
-                                  comment: Optional[Any] = None,
+                                  filter: dict[str, Any],
+                                  projection: dict[str, Any] | list[str] | None = None,
+                                  sort: _IndexList | None = None,
+                                  hint: _IndexKeyHint | None = None,
+                                  session: ClientSession | None = None,
+                                  let: dict[str, Any] | None = None,
+                                  comment: Any | None = None,
                                   **kwargs: Any) -> dict:
         ...
 
     async def find_one_and_replace(self,
-                                   filter: Mapping[str, Any],
-                                   replacement: Mapping[str, Any],
-                                   projection: Optional[Mapping[str, Any] | Iterable[str]] = None,
-                                   sort: Optional[_IndexList] = None,
+                                   filter: dict[str, Any],
+                                   replacement: dict[str, Any],
+                                   projection: dict[str, Any] | list[str] | None = None,
+                                   sort: _IndexList | None = None,
                                    upsert: bool = False,
                                    return_document: bool = ReturnDocument.BEFORE,
-                                   hint: Optional[_IndexKeyHint] = None,
-                                   session: Optional[ClientSession] = None,
-                                   let: Optional[Mapping[str, Any]] = None,
-                                   comment: Optional[Any] = None,
+                                   hint: _IndexKeyHint | None = None,
+                                   session: ClientSession | None = None,
+                                   let: dict[str, Any] | None = None,
+                                   comment: Any | None = None,
                                    **kwargs: Any,) -> dict:
         ...
 
     async def find_one_and_update(self,
-                                  filter: Mapping[str, Any],
-                                  update: Mapping[str, Any] | _Pipeline,
-                                  projection: Optional[Mapping[str, Any] | Iterable[str]] = None,
-                                  sort: Optional[_IndexList] = None,
+                                  filter: dict[str, Any],
+                                  update: dict[str, Any] | _Pipeline,
+                                  projection: dict[str, Any] | list[str] | None = None,
+                                  sort: _IndexList | None = None,
                                   upsert: bool = False,
                                   return_document: bool = ReturnDocument.BEFORE,
-                                  array_filters: Optional[Sequence[Mapping[str, Any]]] = None,
-                                  hint: Optional[_IndexKeyHint] = None,
-                                  session: Optional[ClientSession] = None,
-                                  let: Optional[Mapping[str, Any]] = None,
-                                  comment: Optional[Any] = None,
+                                  array_filters: Sequence[dict[str, Any]] | None = None,
+                                  hint: _IndexKeyHint | None = None,
+                                  session: ClientSession | None = None,
+                                  let: dict[str, Any] | None = None,
+                                  comment: Any | None = None,
                                   **kwargs: Any) -> dict:
         ...

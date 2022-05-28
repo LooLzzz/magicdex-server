@@ -17,13 +17,15 @@ class Card(MongoModel):
     signed: bool
     altered: bool
     misprint: bool
-    date_created: datetime
+    date_created: datetime = Field(default_factory=datetime.utcnow)
 
     def update(self, aggregate: bool = False, inplace: bool = False, **kwargs) -> 'Card':
         if inplace:
             match kwargs:
                 case {'amount': amount} if AmountInt.is_relative(amount) or aggregate:
                     self.amount += amount
+                case {'date_created': date_created, 'user_id': user_id}:
+                    """ignore"""
                 case {**rest}:
                     for k, v in rest.items():
                         setattr(self, k, v)
@@ -135,6 +137,12 @@ class CardUpdateResponse(CustomBaseModel):
                 card_list.remove(card)
             card_ids.add(card.id)
         return card_list
+
+    @classmethod
+    def merge(cls, responses: list['CardUpdateResponse']) -> 'CardUpdateResponse':
+        res = responses.pop()
+        res.extend(responses=responses)
+        return res
 
     @overload
     def extend(self, *, response: 'CardUpdateResponse') -> 'CardUpdateResponse':
