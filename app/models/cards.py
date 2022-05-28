@@ -51,7 +51,32 @@ class Card(MongoModel):
         return res
 
 
-class CardRequest(CustomBaseModel):
+class CardCreateRequest(CustomBaseModel):
+    scryfall_id: UUID
+    amount: AmountInt = '+1'
+    tag: list[str] = Field(default_factory=list)
+    foil: bool = False
+    condition: Literal['NM', 'LP', 'MP', 'HP', 'DAMAGED'] = 'NM'
+    signed: bool = False
+    altered: bool = False
+    misprint: bool = False
+
+    class Config:
+        schema_extra = {
+            'example': {
+                'scryfall_id': '13f4bafe-0d21-47ba-8f16-0274107d618c',
+                'amount': '+1',
+                'tag': ['zurgo edh', 'turtles'],
+                'foil': True,
+                'condition': 'NM',
+                'signed': False,
+                'altered': False,
+                'misprint': False,
+            }
+        }
+
+
+class CardUpdateRequest(CustomBaseModel):
     id: PyObjectId = Field(alias='_id')
     amount: AmountInt | None = None
     tag: list[str] | None = None
@@ -76,7 +101,7 @@ class CardRequest(CustomBaseModel):
         }
 
 
-class CardRequestNoId(CardRequest):
+class CardRequestNoId(CardUpdateRequest):
     id: Any = Field(None, alias='_id')
 
     @validator('id', check_fields=False)

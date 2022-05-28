@@ -2,17 +2,15 @@ import asyncio
 from typing import Any
 
 from fastapi import Depends, Path
-from motor import core as motor_core
 
+from .. import motor_typing
 from .. import pagination as pg
 from ..common import cards_collection
-from ..exceptions import (HTTPBadRequest, HTTPForbiddenError,
-                          HTTPNotFoundError, NoneTypeError)
+from ..exceptions import HTTPBadRequest, HTTPNotFoundError, NoneTypeError
 from ..models import Card, CardUpdateResponse, PyObjectId, User
-from .users import allowed_to_view_card
 from .utils import compile_case_sensitive_dict
 
-cards_collection: motor_core.Collection[Card]
+cards_collection: motor_typing.AsyncCollection[Card]
 
 
 async def get_own_cards_count(user: User, **filter: dict[str, Any]) -> int:
@@ -47,12 +45,6 @@ async def get_own_cards(user: User, page_request: pg.PageRequest) -> pg.Paginata
         get_own_cards_count(user, **filter)
     )
 
-    for i, card in enumerate(results):
-        allowed_to_view_card(user, card, raise_404_not_found=False)
-        raise HTTPForbiddenError(
-            detail_prefix=f'Card[{page_request.offset+i}]'
-        )
-
     return {
         'results': results,
         'total_items': own_cards_count
@@ -72,18 +64,41 @@ async def get_card_by_id(card_id: PyObjectId = Path(None)) -> Card:
         )
 
 
-async def find_card(card: Card, raise_404_not_found: bool = True) -> Card | None:
+async def find_card(card: Card, raise_http_error: bool = True) -> Card | None:
     res = await cards_collection.find_one(
         card.to_mongo(
             exclude={'id', 'date_created', 'amount'}
         )
     )
-    if not res and raise_404_not_found:
+    if not res and raise_http_error:
         raise HTTPNotFoundError(
             detail='Card not found',
             headers={'WWW-Authenticate': 'Bearer'}
         )
     return Card.parse_obj(res) if res else None
+
+
+async def create_card(new_card: Card) -> CardUpdateResponse:
+    res = CardUpdateResponse()
+
+    if (old_card := await find_card(new_card, raise_http_error=False)):
+        # card already exists -> update it
+        res.extend(
+            responses=[
+                await merge_cards(old_card, new_card, delete_b=False),
+                await update_card(old_card)
+            ]
+        )
+
+    else:
+        # card doesnt exist -> create a new card
+        insert_res = await cards_collection.insert_one(
+            new_card.to_mongo()
+        )
+        new_card.id = insert_res.inserted_id
+        res.extend(created=[new_card])
+
+    return res
 
 
 async def delete_card(card: Card = Depends(get_card_by_id)) -> CardUpdateResponse:
@@ -93,11 +108,12 @@ async def delete_card(card: Card = Depends(get_card_by_id)) -> CardUpdateRespons
     return CardUpdateResponse(deleted=[card])
 
 
-async def merge_cards(a: Card, b: Card) -> CardUpdateResponse:
+async def merge_cards(a: Card, b: Card, *, delete_b: bool = True) -> CardUpdateResponse:
     """
     merges `b` into `a`,
     deletes `b` and returns `a|b`
     """
+    res = CardUpdateResponse()
     a.update(
         **b.to_mongo(
             exclude_none=True
@@ -105,18 +121,19 @@ async def merge_cards(a: Card, b: Card) -> CardUpdateResponse:
         aggregate=True,
         inplace=True
     )
+    res.extend(updated=[a])
 
-    delete_res = await delete_card(b)
+    if delete_b:
+        delete_res = await delete_card(b)
+        res.extend(response=delete_res)
 
-    res = CardUpdateResponse(updated=[a])
-    res.extend(response=delete_res)
     return res
 
 
 async def update_card(new_card: Card) -> CardUpdateResponse:
     res = CardUpdateResponse()
 
-    if (old_card := await find_card(new_card, raise_404_not_found=False)):
+    if (old_card := await find_card(new_card, raise_http_error=False)):
         # merge and delete `prev_card`
         res.extend(
             response=await merge_cards(new_card, old_card)

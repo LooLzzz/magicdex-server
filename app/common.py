@@ -4,6 +4,7 @@ from datetime import timedelta
 from motor import core as motor_core
 from motor import motor_asyncio
 from passlib.context import CryptContext
+from . import motor_typing
 
 # cryptoghraphy
 ACCESS_TOKEN_EXPIRE = timedelta(weeks=4)
@@ -21,5 +22,5 @@ mongodb_client: motor_core.AgnosticClient = motor_asyncio.AsyncIOMotorClient(
     tls=True,
     tlsAllowInvalidCertificates=True
 )
-users_collection: motor_core.Collection = mongodb_client['magicdex-db']['users']
-cards_collection: motor_core.Collection = mongodb_client['magicdex-db']['cards']
+users_collection: motor_typing.AsyncCollection = mongodb_client['magicdex-db']['users']
+cards_collection: motor_typing.AsyncCollection = mongodb_client['magicdex-db']['cards']
