@@ -19,7 +19,7 @@ AccessTokenDict = TypedDict('AccessTokenT', {'access_token': str, 'token_type': 
 
 
 async def allowed_to_view_card(user: User, card: Card, *, raise_http_error: bool = True) -> bool:
-    if (card.is_public
+    if (user.public
             or card.user_id == user.id):
         return True
 

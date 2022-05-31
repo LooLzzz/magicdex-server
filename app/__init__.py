@@ -5,7 +5,7 @@ from fastapi import FastAPI
 dotenv.load_dotenv()
 
 # fastapi
-app = FastAPI()
+app = FastAPI(docs_url='/docs')
 
 # initialize all necessary common modules and values
 from .common import *

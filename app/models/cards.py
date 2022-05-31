@@ -21,61 +21,43 @@ class Card(MongoModel):
 
     def update(self, aggregate: bool = False, inplace: bool = False, **kwargs) -> 'Card':
         if inplace:
-            match kwargs:
-                case {'amount': amount} if AmountInt.is_relative(amount) or aggregate:
-                    self.amount += amount
-                case {'date_created': date_created, 'user_id': user_id}:
-                    """ignore"""
-                case {**rest}:
-                    for k, v in rest.items():
-                        setattr(self, k, v)
-            return self
-
+            res = self
         else:
-            res = super().copy(update=kwargs)
-            match kwargs:
-                case {'amount': amount} if AmountInt.is_relative(amount) or aggregate:
-                    res.amount += self.amount
-            return res
+            res = super().copy()
 
-    def to_mongo(self,
-                 by_alias: bool = True,
-                 exclude: set | None = {'id'},
-                 exclude_none: bool = True,
-                 **kwargs) -> dict:
-        res = self.dict(by_alias=by_alias,
-                        exclude=exclude,
-                        exclude_none=exclude_none,
-                        **kwargs)
-        res.update({
-            'scryfall_id': str(self.scryfall_id),
-        })
+        amount: AmountInt
+        match kwargs:
+            case {'amount': amount} if amount.is_relative() or aggregate:
+                res.amount += amount
+            case {'date_created': date_created, 'user_id': user_id}:
+                """ignore"""
+            case {**rest}:
+                for k, v in rest.items():
+                    setattr(res, k, v)
         return res
 
+    def _equals(self,
+                other, *,
+                ignore_userid: bool = True,
+                ignore_cardid: bool = True) -> bool:
+        if not isinstance(other, Card):
+            return False
 
-class CardCreateRequest(CustomBaseModel):
-    scryfall_id: UUID
-    amount: AmountInt = '+1'
-    tag: list[str] = Field(default_factory=list)
-    foil: bool = False
-    condition: Literal['NM', 'LP', 'MP', 'HP', 'DAMAGED'] = 'NM'
-    signed: bool = False
-    altered: bool = False
-    misprint: bool = False
+        exclude = set()
+        if ignore_userid:
+            exclude.add('user_id')
+        if ignore_cardid:
+            exclude.add('id')
 
-    class Config:
-        schema_extra = {
-            'example': {
-                'scryfall_id': '13f4bafe-0d21-47ba-8f16-0274107d618c',
-                'amount': '+1',
-                'tag': ['zurgo edh', 'turtles'],
-                'foil': True,
-                'condition': 'NM',
-                'signed': False,
-                'altered': False,
-                'misprint': False,
-            }
-        }
+        a = self.dict(exclude=exclude)
+        b = other.dict(exclude=exclude)
+        return a == b
+
+    def __eq__(self, other) -> bool:
+        return self._equals(other)
+
+    def __ne__(self, other) -> bool:
+        return not self._equals(other)
 
 
 class CardUpdateRequest(CustomBaseModel):
@@ -124,6 +106,45 @@ class CardRequestNoId(CardUpdateRequest):
         }
 
 
+class CardCreateRequest(CardRequestNoId):
+    scryfall_id: UUID
+    amount: AmountInt = '+1'
+    tag: list[str] = Field(default_factory=list)
+    foil: bool = False
+    condition: Literal['NM', 'LP', 'MP', 'HP', 'DAMAGED'] = 'NM'
+    signed: bool = False
+    altered: bool = False
+    misprint: bool = False
+
+    def _equals(self, other) -> bool:
+        if not isinstance(other, CardCreateRequest):
+            return False
+
+        a = self.dict()
+        b = other.dict()
+        return a == b
+
+    def __eq__(self, other) -> bool:
+        return self._equals(other)
+
+    def __ne__(self, other) -> bool:
+        return not self._equals(other)
+
+    class Config(CardRequestNoId.Config):
+        schema_extra = {
+            'example': {
+                'scryfall_id': '13f4bafe-0d21-47ba-8f16-0274107d618c',
+                'amount': '+1',
+                'tag': ['zurgo edh', 'turtles'],
+                'foil': True,
+                'condition': 'NM',
+                'signed': False,
+                'altered': False,
+                'misprint': False,
+            }
+        }
+
+
 class CardUpdateResponse(CustomBaseModel):
     created: list[Card] = Field(default_factory=list)
     updated: list[Card] = Field(default_factory=list)
@@ -138,11 +159,10 @@ class CardUpdateResponse(CustomBaseModel):
             card_ids.add(card.id)
         return card_list
 
-    @classmethod
-    def merge(cls, responses: list['CardUpdateResponse']) -> 'CardUpdateResponse':
-        res = responses.pop()
-        res.extend(responses=responses)
-        return res
+    @staticmethod
+    def merge(responses: list['CardUpdateResponse']) -> 'CardUpdateResponse':
+        """Create a new single CardUpdateResponse object from a list of CardUpdateResponse objects"""
+        return CardUpdateResponse().extend(responses=responses)
 
     @overload
     def extend(self, *, response: 'CardUpdateResponse') -> 'CardUpdateResponse':
@@ -184,6 +204,3 @@ class CardUpdateResponse(CustomBaseModel):
             self.deleted.extend(deleted)
 
         return self
-
-    class Config:
-        validate_assignment = True

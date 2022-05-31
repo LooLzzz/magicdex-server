@@ -7,7 +7,8 @@ from .. import motor_typing
 from .. import pagination as pg
 from ..common import cards_collection
 from ..exceptions import HTTPBadRequest, HTTPNotFoundError, NoneTypeError
-from ..models import Card, CardUpdateResponse, PyObjectId, User
+from ..models import (Card, CardCreateRequest, CardUpdateRequest,
+                      CardUpdateResponse, PyObjectId, User)
 from .utils import compile_case_sensitive_dict
 
 cards_collection: motor_typing.AsyncCollection[Card]
@@ -64,40 +65,33 @@ async def get_card_by_id(card_id: PyObjectId = Path(None)) -> Card:
         )
 
 
-async def find_card(card: Card, raise_http_error: bool = True) -> Card | None:
-    res = await cards_collection.find_one(
-        card.to_mongo(
+async def find_card(card: Card | CardUpdateRequest,
+                    user_id: PyObjectId | None = None, *,
+                    skip_same_id: bool = False,
+                    raise_http_error: bool = True) -> Card | None:
+    if user_id is None:
+        if not hasattr(card, 'user_id'):
+            raise ValueError('user_id is required')
+        user_id = card.user_id
+
+    res = await cards_collection.find_one({
+        **card.to_mongo(
             exclude={'id', 'date_created', 'amount'}
-        )
-    )
-    if not res and raise_http_error:
+        ),
+        'user_id': user_id
+    })
+
+    res = Card.parse_obj(res) if res else None
+
+    if raise_http_error and not res:
         raise HTTPNotFoundError(
             detail='Card not found',
             headers={'WWW-Authenticate': 'Bearer'}
         )
-    return Card.parse_obj(res) if res else None
 
-
-async def create_card(new_card: Card) -> CardUpdateResponse:
-    res = CardUpdateResponse()
-
-    if (old_card := await find_card(new_card, raise_http_error=False)):
-        # card already exists -> update it
-        res.extend(
-            responses=[
-                await merge_cards(old_card, new_card, delete_b=False),
-                await update_card(old_card)
-            ]
-        )
-
-    else:
-        # card doesnt exist -> create a new card
-        insert_res = await cards_collection.insert_one(
-            new_card.to_mongo()
-        )
-        new_card.id = insert_res.inserted_id
-        res.extend(created=[new_card])
-
+    if (skip_same_id and res
+            and res.id == card.id):
+        return None
     return res
 
 
@@ -115,28 +109,61 @@ async def merge_cards(a: Card, b: Card, *, delete_b: bool = True) -> CardUpdateR
     """
     res = CardUpdateResponse()
     a.update(
-        **b.to_mongo(
-            exclude_none=True
-        ),
+        **b.to_mongo(),
         aggregate=True,
         inplace=True
     )
     res.extend(updated=[a])
 
-    if delete_b:
+    if delete_b and a.id != b.id:
         delete_res = await delete_card(b)
         res.extend(response=delete_res)
 
     return res
 
 
-async def update_card(new_card: Card) -> CardUpdateResponse:
+async def create_card(create_request: CardCreateRequest, user: User) -> CardUpdateResponse:
     res = CardUpdateResponse()
+    new_card = Card(
+        **create_request.to_mongo(),
+        user_id=user.id
+    )
 
-    if (old_card := await find_card(new_card, raise_http_error=False)):
-        # merge and delete `prev_card`
+    if prev_card := await find_card(new_card,
+                                    raise_http_error=False):
+        # card already exists -> update it
         res.extend(
-            response=await merge_cards(new_card, old_card)
+            response=await update_card(
+                card=prev_card,
+                update_request=CardUpdateRequest(
+                    **create_request.to_mongo(),
+                    id=prev_card.id
+                )
+            )
+        )
+
+    else:
+        # card doesnt exist -> create a new card
+        insert_res = await cards_collection.insert_one(
+            create_request.to_mongo()
+        )
+        create_request.id = insert_res.inserted_id
+        res.extend(created=[create_request])
+
+    return res
+
+
+async def update_card(card: Card, update_request: CardUpdateRequest) -> CardUpdateResponse:
+    res = CardUpdateResponse()
+    new_card = card.update(
+        **update_request.to_mongo()
+    )
+
+    if prev_card := await find_card(new_card,
+                                    skip_same_id=True,
+                                    raise_http_error=False):
+        res.extend(
+            response=await merge_cards(new_card, prev_card)
         )
 
     update_res = await cards_collection.update_one(

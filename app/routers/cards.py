@@ -36,7 +36,7 @@ async def update_own_card(card: Card = Depends(services.get_card_by_id, use_cach
                           current_user: User = Depends(services.get_current_user),
                           card_request: CardRequestNoId = Body(None)):
     # authentication #
-    await services.allowed_to_view_card(current_user, card, raise_http_error=True)
+    await services.allowed_to_edit_card(current_user, card, raise_http_error=True)
 
     if card_request.is_empty():
         raise HTTPBadRequest(
@@ -46,11 +46,8 @@ async def update_own_card(card: Card = Depends(services.get_card_by_id, use_cach
     # authentication #
 
     return await services.update_card(
-        card.update(
-            **card_request.dict(
-                exclude_none=True
-            )
-        )
+        card=card,
+        update_request=card_request
     )
 
 
@@ -95,13 +92,8 @@ async def update_own_cards(current_user: User = Depends(services.get_current_use
     # authentication #
 
     update_results: list[CardUpdateResponse] = await asyncio.gather(*[
-        services.update_card(
-            card.update(
-                **req.dict(
-                    exclude_none=True
-                )
-            )
-        )
+        services.update_card(card=card,
+                             update_request=req)
         for card, req in zip(cards, card_requests)
     ])
 
@@ -127,14 +119,22 @@ async def create_own_cards(current_user: User = Depends(services.get_current_use
         verify_uuid_exist(card, idx)
         for idx, card in enumerate(card_requests)
     ])
+
+    # check for duplicates
+    _cards = []
+    for idx, card in enumerate(card_requests):
+        if card in _cards:
+            raise HTTPBadRequest(
+                detail_prefix=f'Card[{idx}]:',
+                detail=f'Duplicated request',
+            )
+        _cards.append(card)
     # authentication #
 
     create_results: list[CardUpdateResponse] = await asyncio.gather(*[
         services.create_card(
-            Card(
-                user_id=current_user.id,
-                **req.dict()
-            )
+            create_request=req,
+            user=current_user
         )
         for req in card_requests
     ])
@@ -144,11 +144,13 @@ async def create_own_cards(current_user: User = Depends(services.get_current_use
 
 
 # @router.delete('/me/{card_id}', response_model=Card)
-# async def delete_own_card(card: Card = Depends(services.get_card_by_id)):
+# async def delete_own_card(current_user: User = Depends(services.get_current_user),
+#                           card: Card = Depends(services.get_card_by_id)):
 #     # TODO: delete own card
 #     pass
 
 # @router.delete('/me', response_model=list[Card])
-# async def delete_own_cards(current_user: User = Depends(services.get_current_user)):
+# async def delete_own_cards(current_user: User = Depends(services.get_current_user),
+#                            card_requests: list[CardDeleteRequest] = Body(None)):
 #     # TODO: delete own cards
 #     pass
