@@ -2,7 +2,7 @@ from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
 
-from . import app, routers
+from . import app, exceptions, routers
 
 app.include_router(routers.auth_router, prefix='/auth', tags=['Auth'])
 app.include_router(routers.cards_router, prefix='/cards', tags=['Cards'])
@@ -27,6 +27,13 @@ async def redirect_login():
 
 @app.exception_handler(404)
 async def nop(request: Request, exc: HTTPException):
+    if isinstance(exc, exceptions.HTTPNotFoundError):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                'detail': exc.detail
+            }
+        )
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
         content={

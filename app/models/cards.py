@@ -85,12 +85,14 @@ class CardUpdateRequest(CustomBaseModel):
         }
 
 
-class CardRequestNoId(CardUpdateRequest):
-    id: Any = Field(None, alias='_id')
-
-    @validator('id', check_fields=False)
-    def ignore_id(cls, value):
-        return None
+class CardUpdateRequestNoId(CustomBaseModel):
+    amount: AmountInt | None = None
+    tag: list[str] | None = None
+    foil: bool | None = None
+    condition: Literal['NM', 'LP', 'MP', 'HP', 'DAMAGED'] | None = None
+    signed: bool | None = None
+    altered: bool | None = None
+    misprint: bool | None = None
 
     class Config:
         schema_extra = {
@@ -106,7 +108,18 @@ class CardRequestNoId(CardUpdateRequest):
         }
 
 
-class CardCreateRequest(CardRequestNoId):
+class CardDeleteRequest(CustomBaseModel):
+    id: PyObjectId = Field(alias='_id')
+
+    class Config:
+        schema_extra = {
+            'example': {
+                'id': '62893131e783d76debacbde6',
+            }
+        }
+
+
+class CardCreateRequest(CustomBaseModel):
     scryfall_id: UUID
     amount: AmountInt = '+1'
     tag: list[str] = Field(default_factory=list)
@@ -130,7 +143,7 @@ class CardCreateRequest(CardRequestNoId):
     def __ne__(self, other) -> bool:
         return not self._equals(other)
 
-    class Config(CardRequestNoId.Config):
+    class Config(CardUpdateRequestNoId.Config):
         schema_extra = {
             'example': {
                 'scryfall_id': '13f4bafe-0d21-47ba-8f16-0274107d618c',

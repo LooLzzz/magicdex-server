@@ -5,8 +5,9 @@ from fastapi import APIRouter, Body, Depends
 from .. import pagination as pg
 from .. import services
 from ..exceptions import HTTPBadRequest, HTTPForbiddenError, HTTPNotFoundError
-from ..models import (Card, CardCreateRequest, CardRequestNoId,
-                      CardUpdateRequest, CardUpdateResponse, User)
+from ..models import (Card, CardCreateRequest, CardDeleteRequest,
+                      CardUpdateRequest, CardUpdateRequestNoId,
+                      CardUpdateResponse, User)
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ async def get_own_cards(current_user: User = Depends(services.get_current_user),
 @router.patch('/me/{card_id}', response_model=CardUpdateResponse)
 async def update_own_card(card: Card = Depends(services.get_card_by_id, use_cache=False),
                           current_user: User = Depends(services.get_current_user),
-                          card_request: CardRequestNoId = Body(None)):
+                          card_request: CardUpdateRequestNoId = Body(None)):
     # authentication #
     await services.allowed_to_edit_card(current_user, card, raise_http_error=True)
 
@@ -91,14 +92,14 @@ async def update_own_cards(current_user: User = Depends(services.get_current_use
     ])
     # authentication #
 
-    update_results: list[CardUpdateResponse] = await asyncio.gather(*[
-        services.update_card(card=card,
-                             update_request=req)
-        for card, req in zip(cards, card_requests)
-    ])
-
     # merge all update results into one
-    return CardUpdateResponse.merge(update_results)
+    return CardUpdateResponse.merge(
+        await asyncio.gather(*[
+            services.update_card(card=card,
+                                 update_request=req)
+            for card, req in zip(cards, card_requests)
+        ])
+    )
 
 
 @router.put('/me', response_model=CardUpdateResponse)
@@ -121,36 +122,65 @@ async def create_own_cards(current_user: User = Depends(services.get_current_use
     ])
 
     # check for duplicates
-    _cards = []
+    cards = []
     for idx, card in enumerate(card_requests):
-        if card in _cards:
+        if card in cards:
             raise HTTPBadRequest(
                 detail_prefix=f'Card[{idx}]:',
                 detail=f'Duplicated request',
             )
-        _cards.append(card)
+        cards.append(card)
     # authentication #
 
-    create_results: list[CardUpdateResponse] = await asyncio.gather(*[
-        services.create_card(
-            create_request=req,
-            user=current_user
-        )
-        for req in card_requests
+    # merge all create results into one
+    return CardUpdateResponse.merge(
+        await asyncio.gather(*[
+            services.create_card(
+                create_request=req,
+                user=current_user
+            )
+            for req in card_requests
+        ])
+    )
+
+
+@router.delete('/me/{card_id}', response_model=CardUpdateResponse)
+async def delete_own_card(current_user: User = Depends(services.get_current_user),
+                          card: Card = Depends(services.get_card_by_id)):
+    # authentication #
+    await services.allowed_to_edit_card(current_user, card, raise_http_error=True)
+    # authentication #
+
+    return await services.delete_card(card)
+
+
+@router.delete('/me', response_model=CardUpdateResponse)
+async def delete_own_cards(current_user: User = Depends(services.get_current_user),
+                           card_requests: list[CardDeleteRequest] = Body(None)):
+    # authentication #
+    async def verify_edit_permission(card: Card, idx: int):
+        try:
+            await services.allowed_to_edit_card(current_user, card, raise_http_error=True)
+        except HTTPForbiddenError as e:
+            raise HTTPForbiddenError(
+                detail=e.detail,
+                detail_prefix=f'Card[{idx}]:',
+            )
+
+    cards = await asyncio.gather(*[
+        services.get_card_by_id(card_req.id)
+        for card_req in card_requests
     ])
 
-    # merge all create results into one
-    return CardUpdateResponse.merge(create_results)
+    await asyncio.gather(*[
+        verify_edit_permission(card, idx)
+        for idx, card in enumerate(cards)
+    ])
+    # authentication #
 
-
-# @router.delete('/me/{card_id}', response_model=Card)
-# async def delete_own_card(current_user: User = Depends(services.get_current_user),
-#                           card: Card = Depends(services.get_card_by_id)):
-#     # TODO: delete own card
-#     pass
-
-# @router.delete('/me', response_model=list[Card])
-# async def delete_own_cards(current_user: User = Depends(services.get_current_user),
-#                            card_requests: list[CardDeleteRequest] = Body(None)):
-#     # TODO: delete own cards
-#     pass
+    # merge all delete results into one
+    return CardUpdateResponse.merge(
+        await asyncio.gather(*[
+            services.delete_card(card)
+            for card in cards
+        ]))

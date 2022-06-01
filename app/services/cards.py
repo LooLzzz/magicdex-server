@@ -95,13 +95,6 @@ async def find_card(card: Card | CardUpdateRequest,
     return res
 
 
-async def delete_card(card: Card = Depends(get_card_by_id)) -> CardUpdateResponse:
-    delete_res = await cards_collection.delete_one(
-        filter={'_id': card.id}
-    )
-    return CardUpdateResponse(deleted=[card])
-
-
 async def merge_cards(a: Card, b: Card, *, delete_b: bool = True) -> CardUpdateResponse:
     """
     merges `b` into `a`,
@@ -120,6 +113,13 @@ async def merge_cards(a: Card, b: Card, *, delete_b: bool = True) -> CardUpdateR
         res.extend(response=delete_res)
 
     return res
+
+
+async def delete_card(card: Card = Depends(get_card_by_id)) -> CardUpdateResponse:
+    delete_res = await cards_collection.delete_one(
+        filter={'_id': card.id}
+    )
+    return CardUpdateResponse(deleted=[card])
 
 
 async def create_card(create_request: CardCreateRequest, user: User) -> CardUpdateResponse:
@@ -145,10 +145,10 @@ async def create_card(create_request: CardCreateRequest, user: User) -> CardUpda
     else:
         # card doesnt exist -> create a new card
         insert_res = await cards_collection.insert_one(
-            create_request.to_mongo()
+            new_card.to_mongo()
         )
-        create_request.id = insert_res.inserted_id
-        res.extend(created=[create_request])
+        new_card.id = insert_res.inserted_id
+        res.extend(created=[new_card])
 
     return res
 
