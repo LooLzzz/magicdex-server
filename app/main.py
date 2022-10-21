@@ -1,43 +1,53 @@
-from flask import redirect
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import ValidationError
 
-from . import app, api
-from .routes import auth, collections, users
+from . import app, exceptions, routers
 
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<string:path>')
-def index(path):
-    '''
-    Catch-all route
-    '''
-    return {'message': 'this is not the api you are looking for'}, 418
+app.include_router(routers.auth_router, prefix='/auth', tags=['Auth'])
+app.include_router(routers.cards_router, prefix='/cards', tags=['Cards'])
+app.include_router(routers.users_router, prefix='/users', tags=['Users'])
 
 
-def init_auth_route():
-    api.add_resource(auth.UsersEndpoint, '/auth', endpoint='auth')
-    api.add_resource(auth.UsersEndpoint, '/auth/users')
+@app.get('/', include_in_schema=False)
+async def redirect_docs():
+    return RedirectResponse(
+        url=app.docs_url,
+        status_code=status.HTTP_308_PERMANENT_REDIRECT
+    )
 
 
-def init_phash_route():
-    func = lambda: redirect('https://github.com/LooLzzz/magicdex-server/raw/phash/image_data.pickle', 308)
-    app.add_url_rule('/phash', 'phash', func, methods=['GET'])
+@app.post('/token', include_in_schema=False)
+async def redirect_login():
+    return RedirectResponse(
+        url='/auth/login',
+        status_code=status.HTTP_308_PERMANENT_REDIRECT
+    )
 
 
-def init_collections_route():
-    api.add_resource(collections.CollectionsEndpoint, '/collections', endpoint='collections')
-    api.add_resource(collections.CardEndpoint,        '/collections/<string:card_id>', endpoint='collections_card')
-    api.add_resource(collections.AllEndpoint,         '/collections/all', endpoint='collections_all')
-    
-    
-def init_users_route():
-    api.add_resource(users.UsersEndpoint,       '/users', '/users/<string:username>', endpoint='users')
-    api.add_resource(users.CollectionsEndpoint, '/users/<string:username>/collection', endpoint='user_collection')
-    api.add_resource(users.CardEndpoint,        '/users/<string:username>/collection/<string:card_id>', endpoint='user_collection_card')
-    api.add_resource(users.AllEndpoint,         '/users/<string:username>/collection/all', endpoint='user_collections_all')
+@app.exception_handler(404)
+async def nop(request: Request, exc: HTTPException):
+    if isinstance(exc, exceptions.HTTPNotFoundError):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={
+                'detail': exc.detail
+            }
+        )
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={
+            'detail': 'This is not the page you are looking for',
+            'docs': str(request.base_url) + app.docs_url.lstrip('/')
+        }
+    )
 
 
-## main ##
-init_auth_route()
-init_phash_route()
-init_collections_route()
-init_users_route()
+@app.exception_handler(ValidationError)
+async def nop(request: Request, exc: ValidationError):
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            'detail': exc.errors()
+        }
+    )
