@@ -1,8 +1,11 @@
 .vscode/
 .venv/
+.deta/
 .env
 
 .markdownlint.json
 
 __pycache__/
 *.pyc
+
+.space

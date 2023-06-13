@@ -29,6 +29,7 @@ class CollectionsEndpoint(Resource):
         # page, per_page = get_arg_list(parsers.pagination_parser)
         args = get_arg_dict(parsers.pagination_parser)
         page, per_page = args['page'], args['per_page']
+        app_url = os.getenv("APP_URL") or os.getenv("DETA_SPACE_APP_HOSTNAME")
 
         data = user.collection \
                 .load(page, per_page, cards) \
@@ -46,7 +47,7 @@ class CollectionsEndpoint(Resource):
             # show url for the next page if there are cards left to show
             page += 1
             args = '&'.join([ f'{k}={v}' for k,v in args.items() ])
-            res['next_page'] = f'{os.getenv("APP_URL")}/collections?{args}'
+            res['next_page'] = f'{app_url}/collections?{args}'
         
         return res
 

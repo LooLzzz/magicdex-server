@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config['PROPAGATE_EXCEPTIONS'] = True
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-app.config['MONGO_URI'] = os.getenv('MONGO_RW_URI')
+app.config['MONGO_URI'] = os.getenv('MONGODB_URL')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(weeks=4)
 
 ## addons ##
@@ -25,7 +25,7 @@ mongo = PyMongo(app, tlsCAFile=certifi.where())
 bcrypt = Bcrypt(app)
 api = Api(app)
 jwt = JWTManager(app)
-cors = CORS(app)
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
 ## mongodb collections ##
 users_db = mongo.db['users']

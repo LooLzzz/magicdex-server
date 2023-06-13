@@ -96,12 +96,13 @@ class CollectionModel():
         '''
         skip_amount = (page - 1) * per_page
         doc_count = len(cards) if cards else self.doc_count()
+        app_url = os.getenv("APP_URL") or os.getenv("DETA_SPACE_APP_HOSTNAME")
 
         if skip_amount >= doc_count:
             abort(make_response(
                 jsonify({
                     'message': 'pagination page out of bounds',
-                    'first_page': f'{os.getenv("APP_URL")}/collections?page=1&per_page={per_page}',
+                    'first_page': f'{app_url}/collections?page=1&per_page={per_page}',
                     'data': []
                 }),
                 200
